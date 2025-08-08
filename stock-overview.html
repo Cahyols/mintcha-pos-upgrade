@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stock Overview – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .export-btn, .import-btn {
+      padding: 8px 14px;
+      margin: 0 10px 10px 0;
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .export-btn:hover, .import-btn:hover {
+      background-color: #1b5e20;
+    }
+    .stock-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 15px 0;
+    }
+    #importStockFile {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- === Sidebar Navigation === -->
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li class="active"><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">Logged In As</p>
+        <p id="currentCashier"></p>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- === Main Content: Stock Overview === -->
+    <section class="dashboard page stock-page">
+      <header class="dashboard-header">
+        <h1>Stock Overview</h1>
+      </header>
+
+      <!-- === Add/Edit Stock Form (Admin only) === -->
+      <div id="stockFormSection" class="stock-form hidden">
+        <h3><span id="formTitle">Add New Stock Item</span></h3>
+        <form id="addStockForm">
+          <input type="text" id="stockName" placeholder="Item Name" required />
+          <input type="number" id="stockQty" placeholder="Quantity" required />
+          <input type="text" id="stockUnit" placeholder="Unit (e.g. box, bottle)" required />
+          <input type="text" id="conversionUnit" placeholder="Conversion Unit (e.g. ml)" />
+          <input type="number" id="conversionValue" placeholder="1 Unit = How Many Conversion Units?" />
+          <input type="number" id="lowThreshold" placeholder="Low Stock Threshold (e.g. 5)" />
+          <button type="submit" id="submitStockBtn">Save</button>
+        </form>
+      </div>
+
+      <!-- === Export + Filter Options === -->
+      <div class="stock-actions-bar">
+        <div class="stock-filter">
+          <label>
+            <input type="checkbox" id="toggleLowStockOnly" />
+            Show only low stock items
+          </label>
+        </div>
+
+        <!-- Admin buttons will be injected here by JS -->
+        <div id="adminExportContainer"></div>
+      </div>
+
+      <!-- === Stock Table Display === -->
+      <div class="stock-table-wrapper">
+        <table class="sales-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Item</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Conversion</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="stockTableBody">
+            <!-- JS will populate this -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ✅ Toast Notification -->
+  <div id="toast" class="toast"></div>
+
+  <!-- === Scripts === -->
+  <script src="js/common.js"></script>
+  <script src="js/stock-overview.js"></script>
+</body>
+</html>

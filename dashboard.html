@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- === SIDEBAR === -->
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li class="active"><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+          <!-- Admin-only -->
+          <li id="adminStockUsageLink" style="display:none;"><a href="stock-usage.html">Stock Usage</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- === MAIN CONTENT === -->
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>Welcome to Mintcha POS</h1>
+        <p>You're logged in as: <span id="loggedUser"></span></p>
+      </header>
+
+      <!-- === Dashboard Content (Optional) === -->
+      <div style="padding: 1rem;">
+        <p>[Dashboard content goes here]</p>
+      </div>
+
+      <!-- === Low Stock Alerts Section === -->
+      <section class="dashboard-card warning-card">
+        <h3>⚠️ Low Stock Alerts</h3>
+        <ul id="lowStockList">
+          <!-- Populated by JS -->
+        </ul>
+      </section>
+    </section>
+  </div>
+
+  <!-- === Scripts === -->
+  <script src="js/common.js"></script>
+  <script src="js/dashboard.js"></script>
+
+
+  <script>
+    // Show "Stock Usage" link only for admins
+    const role = localStorage.getItem("mintchaRole");
+    const user = localStorage.getItem("mintchaUser");
+    
+    if (role === "admin") {
+      const usageLink = document.getElementById("adminStockUsageLink");
+      if (usageLink) usageLink.style.display = "list-item";
+    }
+
+    // Show current user
+    document.getElementById("loggedUser").textContent = user || "Unknown";
+  </script>
+</body>
+</html>

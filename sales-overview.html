@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sales Overview – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li class="active"><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">Logged In As</p>
+        <p id="currentCashier"></p>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="dashboard page sales-page">
+      <header class="dashboard-header">
+        <h1>Sales Overview</h1>
+      </header>
+
+      <!-- === Filter Controls === -->
+<div class="filter-bar">
+  <h3>Filter Sales</h3>
+  <div class="filters">
+    <label>From: 
+      <input type="date" id="fromDate" onchange="applyFilters()" />
+    </label>
+    <label>To: 
+      <input type="date" id="toDate" onchange="applyFilters()" />
+    </label>
+
+    <label>Cashier:
+      <select id="filterCashier" onchange="applyFilters()">
+        <option value="">All</option>
+        <!-- JS will populate -->
+      </select>
+    </label>
+
+    <label>Payment:
+      <select id="filterPayment" onchange="applyFilters()">
+        <option value="">All</option>
+        <option value="Cash">Cash</option>
+        <option value="QR">QR</option>
+        <option value="Ewallet">Ewallet</option>
+        <option value="Card">Card</option>
+      </select>
+    </label>
+
+    <label>Status:
+      <select id="filterStatus" onchange="applyFilters()">
+        <option value="">All</option>
+        <option value="Preparing">Preparing</option>
+        <option value="Completed">Completed</option>
+        <option value="Refunded">Refunded</option>
+      </select>
+    </label>
+
+    <button class="import-btn" onclick="resetFilters()">Reset</button>
+  </div>
+</div>
+
+      <!-- === Export Buttons for Admin === -->
+      <div id="exportControls" class="admin-controls"></div>
+
+      <!-- === Sales Table === -->
+      <div class="sales-table-wrapper">
+        <table class="sales-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Order ID</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Cashier</th>
+              <th>Customer</th>
+              <th>Items</th>
+              <th>Note</th>
+              <th>Total</th>
+              <th>Payment</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="salesTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- === Pagination === -->
+      <div id="paginationControls" class="pagination"></div>
+    </section>
+  </div>
+
+  <!-- === Scripts === -->
+  <script src="js/common.js"></script>
+  <script src="js/sales-overview.js"></script>
+</body>
+</html>

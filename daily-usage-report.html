@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Daily Stock Usage Report – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .export-btn {
+      padding: 8px 14px;
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .export-btn:hover {
+      background-color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="stock-usage.html">Stock Usage</a></li>
+          <li class="active"><a href="daily-usage-report.html">Daily Usage Report</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>Daily Stock Usage Report</h1>
+      </header>
+
+      <div class="report-header">
+        <label>
+          Filter by Date:
+          <select id="dateSelector"></select>
+        </label>
+        <button id="exportCSV" class="export-btn">⬇️ Export CSV</button>
+      </div>
+
+      <table class="sales-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Ingredient</th>
+            <th>Total Used</th>
+            <th>Unit</th>
+          </tr>
+        </thead>
+        <tbody id="usageTableBody">
+          <!-- Injected by JS -->
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const usageData = JSON.parse(localStorage.getItem("mintcha_usage") || "{}");
+      const dateSelector = document.getElementById("dateSelector");
+      const tableBody = document.getElementById("usageTableBody");
+
+      const allDates = Object.keys(usageData).sort().reverse(); // latest first
+
+      // Populate dropdown
+      allDates.forEach(date => {
+        const opt = document.createElement("option");
+        opt.value = date;
+        opt.textContent = date;
+        dateSelector.appendChild(opt);
+      });
+
+      // Render table based on selected date
+      function renderUsageTable(date) {
+        const usage = usageData[date] || {};
+        const keys = Object.keys(usage);
+        tableBody.innerHTML = "";
+
+        if (!keys.length) {
+          tableBody.innerHTML = `<tr><td colspan="4">No data for this date.</td></tr>`;
+          return;
+        }
+
+        keys.forEach((key, idx) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${key}</td>
+            <td>${usage[key].total.toFixed(2)}</td>
+            <td>${usage[key].unit}</td>
+          `;
+          tableBody.appendChild(row);
+        });
+      }
+
+      // Export CSV
+      document.getElementById("exportCSV").addEventListener("click", () => {
+        const date = dateSelector.value;
+        const usage = usageData[date] || {};
+        const rows = [["Ingredient", "Total Used", "Unit"]];
+
+        Object.entries(usage).forEach(([name, info]) => {
+          rows.push([name, info.total.toFixed(2), info.unit]);
+        });
+
+        const csvContent = rows.map(r => r.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `daily_stock_usage_${date}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // Initialize
+      if (allDates.length) {
+        renderUsageTable(allDates[0]);
+        dateSelector.value = allDates[0];
+      }
+
+      dateSelector.addEventListener("change", () => {
+        renderUsageTable(dateSelector.value);
+      });
+    });
+  </script>
+</body>
+</html>

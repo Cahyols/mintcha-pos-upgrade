@@ -1,0 +1,714 @@
+/* ============================================================
+ GENERAL STYLES
+============================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background-color: #f7f7f7;
+  color: #333;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5 {
+  margin-bottom: 0.5rem;
+}
+
+button {
+  cursor: pointer;
+  background-color: #00897b;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+}
+
+button:hover {
+  background-color: #00695c;
+}
+
+.hidden {
+  display: none;
+}
+
+/* ============================================================
+ LOGIN PAGE
+============================================================ */
+
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #fff;
+}
+
+.login-box {
+  background: #f0f0f0;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  width: 300px;
+  text-align: center;
+}
+
+.login-box input {
+  width: 100%;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.login-box button {
+  width: 100%;
+  padding: 0.6rem;
+  background-color: #009688;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.login-box button:hover {
+  background-color: #00796b;
+}
+
+.error-msg {
+  color: red;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+ SIDEBAR
+============================================================ */
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #004d40;
+  color: white;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.sidebar .brand {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.nav-section .section-title {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.nav-section ul {
+  list-style: none;
+}
+
+.nav-section li {
+  padding: 0.5rem;
+  margin-bottom: 0.3rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.nav-section li:hover,
+.nav-section li.active,
+.nav-section li a:hover {
+  background-color: #00796b;
+}
+
+.nav-section li a {
+  color: white;
+  text-decoration: none;
+  display: block;
+}
+
+/* ============================================================
+ DASHBOARD PAGE
+============================================================ */
+.dashboard {
+  flex-grow: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+/* ============================================================
+ ORDER MANAGEMENT
+============================================================ */
+
+.order-container {
+  display: flex;
+  gap: 2rem;
+}
+
+.menu-panel, .cart-panel {
+  background-color: #fff;
+  padding: 1rem;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+  flex: 1;
+  min-height: 400px;
+}
+
+.menu-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.menu-item {
+  background: #e0f2f1;
+  padding: 0.8rem;
+  border-radius: 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background: #b2dfdb;
+}
+
+.cart-list {
+  margin-bottom: 1rem;
+  border-top: 1px solid #ccc;
+  padding-top: 1rem;
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 0.9rem;
+}
+
+.cart-item .item-name {
+  flex: 1;
+}
+
+.cart-item .item-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cart-item .item-controls button {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 3px;
+  color: white;
+  background-color: #009688;
+}
+
+.cart-item .item-controls .remove-btn {
+  background-color: #f44336;
+}
+
+.cart-item .item-controls .remove-btn:hover {
+  background-color: #d32f2f;
+}
+
+.cart-total {
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.cart-panel input,
+.cart-panel textarea {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.cart-actions {
+  display: flex;
+  justify-content: space-between;
+}
+
+.cart-actions button {
+  padding: 0.6rem 1rem;
+  background-color: #00796b;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+
+.cart-actions button:hover {
+  background-color: #004d40;
+}
+
+/* ============================================================
+ PAYMENT + RECEIPT MODAL
+============================================================ */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.payment-btn {
+  padding: 0.7rem;
+  border: none;
+  background-color: #00796b;
+  color: white;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.payment-btn:hover {
+  background-color: #004d40;
+}
+
+.close-btn {
+  background: #ccc;
+  color: black;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+#receiptModal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+#receiptContent {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  width: 350px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+}
+
+.receipt-brand {
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.receipt-header,
+.receipt-body,
+.receipt-footer {
+  margin-bottom: 1rem;
+}
+
+.receipt-header div,
+.receipt-body div,
+.receipt-footer div {
+  margin-bottom: 0.4rem;
+}
+
+.receipt-footer {
+  text-align: center;
+}
+
+.receipt-footer button {
+  margin-top: 0.8rem;
+}
+
+.receipt-barcode {
+  height: 40px;
+  background: repeating-linear-gradient(
+    90deg,
+    #000,
+    #000 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  margin: 0.5rem auto;
+  width: 80%;
+  border-radius: 2px;
+}
+
+.receipt-toast {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease;
+  z-index: 1000;
+  min-width: 200px;
+  font-size: 0.9rem;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+ SALES OVERVIEW
+============================================================ */
+
+.sales-overview {
+  padding: 2rem;
+}
+
+.sales-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.sales-table th,
+.sales-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  font-size: 0.95rem;
+}
+
+.sales-table th {
+  background-color: #009688;
+  color: white;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.sales-table tbody tr:hover {
+  background-color: #f1f1f1;
+}
+
+.sales-table td .item-list {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #555;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+  gap: 0.5rem;
+}
+
+.pagination button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #ccc;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.pagination button:hover,
+.pagination button.active {
+  background: #009688;
+  color: white;
+  border-color: #00796b;
+}
+.export-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 1rem 0;
+}
+
+.export-btn {
+  padding: 8px 14px;
+  background-color: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.export-btn:hover {
+  background-color: #1b5e20;
+}
+
+.filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 1rem;
+  padding: 8px 0;
+}
+
+.filter-controls label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+}
+
+.filter-controls input,
+.filter-controls select {
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+}
+
+.filter-controls button {
+  align-self: end;
+}
+
+
+/* ============================================================
+ SHARED COMPONENTS
+============================================================ */
+
+.refunded-row {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  color: white;
+  display: inline-block;
+}
+
+.badge-preparing {
+  background-color: orange;
+}
+
+.badge-completed {
+  background-color: green;
+}
+
+.badge-refunded {
+  background-color: gray;
+}
+
+/* ============================================================
+ ADMIN PRICE EDIT MODE
+============================================================ */
+
+.edit-btn {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background-color: #fbc02d;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.edit-btn:hover {
+  background-color: #f9a825;
+}
+
+.price-input {
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  width: 60px;
+  font-size: 0.9rem;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  text-align: right;
+  background-color: #fff;
+  color: #333;
+}
+
+#priceControls {
+  margin-top: 1rem;
+}
+
+/* ============================================================
+ ADMIN STOCK EDIT MODE
+============================================================ */
+
+.admin-controls {
+  background: #f9f9f9;
+  border: 1px solid #ccc;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+}
+
+.admin-controls input,
+.admin-controls button {
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.stock-qty-input {
+  width: 60px;
+  padding: 0.3rem;
+}
+
+.update-btn {
+  padding: 0.3rem 0.6rem;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 3px;
+}
+
+/* ============================================================
+   STOCK OVERVIEW
+   ============================================================ */
+
+   .stock-form {
+  background: #f9f9f9;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.stock-form form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.8rem;
+}
+
+.stock-form input,
+.stock-form button {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.stock-form button {
+  background-color: #009688;
+  color: white;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+}
+
+.stock-form button:hover {
+  background-color: #00796b;
+}
+
+/* Highlight low stock rows in red tint */
+.low-stock {
+  background-color: #fff3f3; /* light red */
+  border-left: 4px solid red;
+}
+
+.export-btn {
+  background-color: #198754;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.export-btn:hover {
+  background-color: #157347;
+}
+
+.import-btn {
+  background-color: #0d6efd;
+  color: white;
+  padding: 0.5rem 1rem;
+  margin-left: 0.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.import-btn:hover {
+  background-color: #084298;
+}
+
+.toast {
+  visibility: hidden;
+  min-width: 250px;
+  max-width: 400px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 14px 20px;
+  position: fixed;
+  z-index: 9999;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  transition: all 0.5s ease;
+}
+
+.toast.show {
+  visibility: visible;
+  opacity: 1;
+}

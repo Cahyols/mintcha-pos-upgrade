@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Order Management – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li class="active"><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">Logged In As</p>
+        <p id="currentCashier" class="bold"></p>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Dashboard Content -->
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>Order Management</h1>
+      </header>
+
+      <!-- === Menu & Cart Layout === -->
+      <div class="order-container">
+        <!-- Menu Section -->
+        <div class="menu-panel">
+          <h2>Menu</h2>
+          <div id="priceControls"></div> <!-- Admin-only edit controls -->
+          <div class="menu-items" id="menuItems"></div>
+        </div>
+
+        <!-- Cart Section -->
+        <div class="cart-panel">
+          <h2>Cart</h2>
+          <div class="cart-list" id="cartList"></div>
+          <p class="cart-total">Total: <span id="cartTotal">RM0.00</span></p>
+          <input type="text" id="customerName" placeholder="Customer name (optional)" />
+          <textarea id="orderNote" placeholder="Add notes..."></textarea>
+          <div class="cart-actions">
+            <button id="proceedPayment">Proceed to Payment</button>
+            <button id="cancelOrder">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- === Payment Modal === -->
+  <div id="paymentModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closePaymentModal" class="close">&times;</span>
+      <h3>Select Payment Method</h3>
+      <div class="payment-options">
+        <button class="payment-btn" data-method="Cash">💵 Cash</button>
+        <button class="payment-btn" data-method="QR Code">📱 QR Code</button>
+        <button class="payment-btn" data-method="TNG eWallet">🧧 TNG eWallet</button>
+        <button class="payment-btn" data-method="Card">💳 Card</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- === Receipt Modal === -->
+  <div id="receiptModal" class="modal hidden">
+    <div class="modal-content" id="receiptContent">
+      <!-- Receipt content will be dynamically injected -->
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/common.js"></script>
+  <script src="js/order-management.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Menu Recipes – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- === MENU RECIPES PAGE === -->
+  <div class="container">
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li class="active"><a href="menu-recipes.html">Menu Recipes</a></li>
+        </ul>
+      </div>
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>Menu Recipe Editor</h1>
+      </header>
+
+      <div class="menu-editor">
+        <!-- Admin-only controls -->
+        <div class="menu-form" id="adminControls">
+          <input type="text" id="newMenuName" placeholder="New Drink Name" />
+          <input type="number" id="newMenuPrice" placeholder="Price (RM)" step="0.01" />
+          <button id="addMenuItem">+ Add Drink</button>
+        </div>
+
+        <label for="menuSelect"><strong>Select Menu:</strong></label>
+        <select id="menuSelect"></select>
+
+        <div id="recipeEditor" class="hidden">
+          <h3>Ingredients for: <span id="selectedDrinkName"></span></h3>
+          <div id="ingredientList"></div>
+          <div class="ingredient-inputs">
+            <input type="text" id="ingredientName" placeholder="Ingredient name" />
+            <input type="number" id="ingredientQty" placeholder="Quantity" step="0.1" />
+            <input type="text" id="ingredientUnit" placeholder="Unit (ml, g, etc)" />
+            <button id="addIngredient">+ Add Ingredient</button>
+          </div>
+          <button id="saveRecipe">💾 Save Recipe</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script src="js/menu-recipes.js"></script>
+  </script>
+</body>
+</html>

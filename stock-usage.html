@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stock Usage History – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- === Sidebar === -->
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+          <li id="stockUsageLink" style="display: none;"><a href="stock-usage.html">Stock Usage</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- === Page Content === -->
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>Stock Usage History</h1>
+      </header>
+
+      <div class="stock-usage-table-wrapper">
+        <table class="sales-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Ingredient</th>
+              <th>Total Used</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody id="usageTableBody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Show Stock Usage link if user is admin
+    const role = localStorage.getItem("mintchaRole");
+    if (role === "admin") {
+      document.getElementById("stockUsageLink").style.display = "list-item";
+    }
+  </script>
+  <script src="js/stock-usage.js"></script>
+</body>
+</html>
