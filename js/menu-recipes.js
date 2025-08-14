@@ -20,6 +20,9 @@ const ingredientUnit = document.getElementById('ingredientUnit');
 const addIngredientBtn = document.getElementById('addIngredient');
 const saveRecipeBtn = document.getElementById('saveRecipe');
 
+const importCSVInput = document.getElementById('importCSV');
+const exportCSVBtn = document.getElementById('exportCSV');
+
 let selectedMenuIndex = null;
 
 // --- Populate Menu Dropdown ---
@@ -60,7 +63,6 @@ function removeIngredient(index) {
 function saveToStorage() {
   localStorage.setItem(menuKey, JSON.stringify(menuData));
   populateMenuDropdown();
-
   // Trigger storage event so Order Management can refresh
   window.dispatchEvent(new StorageEvent('storage', {
     key: menuKey,
@@ -129,7 +131,6 @@ addMenuItemBtn.addEventListener('click', () => {
   });
 
   saveToStorage();
-
   newMenuName.value = '';
   newMenuPrice.value = '';
   alert('New drink added!');
@@ -143,11 +144,10 @@ function renderDeleteButton() {
   const btn = document.createElement("button");
   btn.id = "deleteDrinkBtn";
   btn.textContent = "🗑️ Delete Drink";
-  btn.className = "delete-drink-btn"; // styled via CSS
+  btn.className = "delete-drink-btn";
 
   btn.onclick = () => {
     if (!confirm(`Delete "${menuData[selectedMenuIndex].name}"? This cannot be undone.`)) return;
-
     menuData.splice(selectedMenuIndex, 1);
     selectedMenuIndex = null;
     saveToStorage();
@@ -157,6 +157,70 @@ function renderDeleteButton() {
 
   recipeEditor.appendChild(btn);
 }
+
+// --- CSV Export ---
+exportCSVBtn?.addEventListener('click', () => {
+  if (!menuData.length) return alert('No menu data to export.');
+
+  let csvContent = 'Drink,Price,Ingredient,Qty,Unit\n';
+  menuData.forEach(drink => {
+    if (drink.ingredients.length) {
+      drink.ingredients.forEach((ing, idx) => {
+        csvContent += `${idx === 0 ? drink.name : ''},${idx === 0 ? drink.price : ''},${ing.name},${ing.qty},${ing.unit}\n`;
+      });
+    } else {
+      csvContent += `${drink.name},${drink.price},,,\n`;
+    }
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'menu_recipes.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// --- CSV Import ---
+importCSVInput?.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const text = event.target.result;
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    let currentDrink = null;
+    const newMenuData = [];
+
+    lines.slice(1).forEach(line => {
+      const [drinkName, drinkPrice, ingName, ingQty, ingUnit] = line.split(',').map(i => i.trim());
+
+      if (drinkName) {
+        currentDrink = {
+          name: drinkName,
+          price: parseFloat(drinkPrice) || 0,
+          ingredients: []
+        };
+        newMenuData.push(currentDrink);
+      }
+
+      if (ingName && ingQty && ingUnit && currentDrink) {
+        currentDrink.ingredients.push({
+          name: ingName,
+          qty: parseFloat(ingQty) || 0,
+          unit: ingUnit
+        });
+      }
+    });
+
+    menuData = newMenuData;
+    saveToStorage();
+    alert('CSV imported successfully!');
+  };
+  reader.readAsText(file);
+});
 
 // --- Admin Access Control ---
 if (localStorage.getItem('mintchaUser') !== 'admin') {

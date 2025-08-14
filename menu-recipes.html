@@ -39,6 +39,12 @@
           <input type="text" id="newMenuName" placeholder="New Drink Name" />
           <input type="number" id="newMenuPrice" placeholder="Price (RM)" step="0.01" />
           <button id="addMenuItem">+ Add Drink</button>
+
+          <!-- Import/Export CSV -->
+          <div class="import-export">
+            <input type="file" id="importCSV" accept=".csv" />
+            <button id="exportCSV">Export CSV</button>
+          </div>
         </div>
 
         <label for="menuSelect"><strong>Select Menu:</strong></label>
@@ -47,12 +53,14 @@
         <div id="recipeEditor" class="hidden">
           <h3>Ingredients for: <span id="selectedDrinkName"></span></h3>
           <div id="ingredientList"></div>
+
           <div class="ingredient-inputs">
             <input type="text" id="ingredientName" placeholder="Ingredient name" />
             <input type="number" id="ingredientQty" placeholder="Quantity" step="0.1" />
             <input type="text" id="ingredientUnit" placeholder="Unit (ml, g, etc)" />
             <button id="addIngredient">+ Add Ingredient</button>
           </div>
+
           <button id="saveRecipe">💾 Save Recipe</button>
         </div>
       </div>
@@ -61,6 +69,5 @@
 
   <script src="js/common.js"></script>
   <script src="js/menu-recipes.js"></script>
-  </script>
 </body>
 </html>
