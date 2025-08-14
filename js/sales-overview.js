@@ -131,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${sale.note || "-"}</td>
         <td>RM${parseFloat(sale.total).toFixed(2)}</td>
         <td>${sale.paymentMethod}</td>
+        <td>${sale.discountType || "None"}</td>
       `;
 
       const statusCell = document.createElement("td");
@@ -271,6 +272,7 @@ function exportToCSV() {
       itemStr,
       s.total,
       s.paymentMethod,
+      s.discountType || "None",
       s.status || "-",
       s.refundReason || "-"
     ]);

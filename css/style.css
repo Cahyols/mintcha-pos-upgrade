@@ -573,6 +573,27 @@ button:hover {
   align-self: end;
 }
 
+.sales-table td:nth-child(11) { /* Assuming Discount is the 11th column */
+  font-weight: bold;
+  color: #d32f2f; /* Slight red for visibility */
+  text-align: center;
+}
+
+.sales-table th:nth-child(11) {
+  background-color: #00796b; /* Slightly darker than header for emphasis */
+  color: #fff;
+  text-align: center;
+}
+
+.sales-table td .discount-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background-color: #c8e6c9; /* light green */
+  color: #2e7d32;
+}
+
 
 /* ============================================================
  SHARED COMPONENTS
