@@ -48,7 +48,7 @@
         <!-- Menu Section -->
         <div class="menu-panel">
           <h2>Menu</h2>
-          <div id="priceControls"></div> <!-- Admin-only edit controls -->
+          <div id="priceControls"></div>
           <div class="menu-items" id="menuItems"></div>
           <div id="menuEmptyState" class="empty-state hidden">
             No menu items available. Please add them in <a href="menu-recipes.html">Menu Recipes</a>.
@@ -60,16 +60,34 @@
           <h2>Cart</h2>
           <div class="cart-list" id="cartList"></div>
           <div id="cartEmptyState" class="empty-state">Your cart is empty</div>
-          <p class="cart-total">Total: <span id="cartTotal">RM0.00</span></p>
+          <p class="cart-total">
+            <span id="cartTotal">RM0.00</span><br>
+            <small id="cartDiscountText" class="hidden">Discount Applied: <span id="discountLabel"></span></small>
+          </p>
           <input type="text" id="customerName" placeholder="Customer name (optional)" />
           <textarea id="orderNote" placeholder="Add notes..."></textarea>
           <div class="cart-actions">
+            <button id="discountBtn">Apply Discount</button>
             <button id="proceedPayment">Proceed to Payment</button>
             <button id="cancelOrder">Cancel</button>
           </div>
         </div>
       </div>
     </section>
+  </div>
+
+  <!-- === Discount Modal === -->
+  <div id="discountModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeDiscountModal" class="close">&times;</span>
+      <h3>Select Discount</h3>
+      <div class="discount-options">
+       <button class="discount-option" data-type="buy1free1">Buy 1 Free 1</button>
+<button class="discount-option" data-type="5off">5% Off</button>
+<button class="discount-option" data-type="10off">10% Off</button>
+        <button id="removeDiscountBtn">Remove Discount</button>
+      </div>
+    </div>
   </div>
 
   <!-- === Payment Modal === -->
@@ -88,13 +106,12 @@
 
   <!-- === Receipt Modal === -->
   <div id="receiptModal" class="modal hidden">
-    <div class="modal-content" id="receiptContent">
-      <!-- Receipt content will be dynamically injected -->
-    </div>
+    <div class="modal-content" id="receiptContent"></div>
   </div>
 
-  <!-- Scripts -->
+  <!-- === Scripts === -->
   <script src="js/common.js"></script>
   <script src="js/order-management.js"></script>
+
 </body>
 </html>

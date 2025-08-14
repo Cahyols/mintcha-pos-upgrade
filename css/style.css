@@ -269,6 +269,55 @@ button:hover {
   font-style: italic;
 }
 
+/* ============================================================
+ Discount
+============================================================ */
+
+/* Modal background */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.5);
+}
+
+/* Modal content */
+.modal-content {
+  background-color: #fff;
+  margin: 10% auto;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+}
+
+.close {
+  float: right;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.discount-option {
+  display: block;
+  margin: 10px auto;
+  padding: 10px;
+  width: 80%;
+  background-color: #4CAF50;
+  border: none;
+  color: white;
+  font-size: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.discount-option:hover {
+  background-color: #45a049;
+}
 
 /* ============================================================
  PAYMENT + RECEIPT MODAL
