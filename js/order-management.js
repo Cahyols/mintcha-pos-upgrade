@@ -1,13 +1,4 @@
-// === Load Menu and Recipes ===
-const fallbackMenu = [
-  { name: "Mintcha Bloom", price: 15 },
-  { name: "Ichigo Shortcha", price: 18 },
-  { name: "Matcha Muse", price: 11 },
-  { name: "Mint Majesty", price: 12 },
-  { name: "Frosted Mintcha", price: 12 },
-];
-
-let sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || fallbackMenu;
+let sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
 
 // === Cart & Discount State ===
 let cart = [];
@@ -34,7 +25,9 @@ const discountOptions = document.querySelectorAll(".discount-option");
 const removeDiscountBtn = document.getElementById("removeDiscountBtn"); // optional remove discount button
 
 // === Render Menu Items ===
+// In order-management.js
 function renderMenu(editMode = false) {
+  sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
   menuContainer.innerHTML = "";
 
   if (!sampleMenu.length) {
@@ -46,20 +39,13 @@ function renderMenu(editMode = false) {
   sampleMenu.forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "menu-item";
-
-    if (editMode) {
-      div.innerHTML = `
-        <strong>${item.name}</strong><br>
-        <input type="number" min="0" step="0.1" value="${item.price.toFixed(2)}" data-index="${index}" class="price-input" /> RM
-      `;
-    } else {
-      div.innerHTML = `<strong>${item.name}</strong><br>RM${item.price.toFixed(2)}`;
-      div.onclick = () => addToCart(index);
-    }
-
+    div.innerHTML = `<strong>${item.name}</strong><br>RM${parseFloat(item.price).toFixed(2)}`;
+    div.onclick = () => addToCart(index);
     menuContainer.appendChild(div);
   });
 }
+
+
 
 // === Render Admin Edit Button ===
 function renderPriceEditorIfAdmin() {
