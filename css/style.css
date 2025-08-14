@@ -262,6 +262,14 @@ button:hover {
   background-color: #004d40;
 }
 
+.empty-menu {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+  font-style: italic;
+}
+
+
 /* ============================================================
  PAYMENT + RECEIPT MODAL
 ============================================================ */

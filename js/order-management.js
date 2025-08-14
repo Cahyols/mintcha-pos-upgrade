@@ -15,7 +15,9 @@ let cart = [];
 // === DOM Elements ===
 const menuContainer = document.getElementById("menuItems");
 const priceControls = document.getElementById("priceControls");
+const menuEmptyState = document.getElementById("menuEmptyState");
 const cartList = document.getElementById("cartList");
+const cartEmptyState = document.getElementById("cartEmptyState");
 const cartTotal = document.getElementById("cartTotal");
 const proceedPayment = document.getElementById("proceedPayment");
 const cancelOrder = document.getElementById("cancelOrder");
@@ -28,6 +30,13 @@ const receiptContent = document.getElementById("receiptContent");
 // === Render Menu Items ===
 function renderMenu(editMode = false) {
   menuContainer.innerHTML = "";
+
+  if (!sampleMenu.length) {
+    menuEmptyState.classList.remove("hidden");
+    return;
+  }
+  menuEmptyState.classList.add("hidden");
+
   sampleMenu.forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "menu-item";
@@ -108,6 +117,12 @@ function decreaseQty(index) {
 function updateCart() {
   cartList.innerHTML = "";
   let total = 0;
+
+  if (!cart.length) {
+    cartEmptyState.classList.remove("hidden");
+  } else {
+    cartEmptyState.classList.add("hidden");
+  }
 
   cart.forEach((item, idx) => {
     total += item.price * item.qty;
@@ -304,4 +319,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const cashierDisplay = document.getElementById("currentCashier");
   if (cashierDisplay) cashierDisplay.textContent = user;
+
+  updateCart(); // Show empty cart state on load
 });

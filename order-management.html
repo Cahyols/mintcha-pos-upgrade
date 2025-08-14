@@ -50,12 +50,16 @@
           <h2>Menu</h2>
           <div id="priceControls"></div> <!-- Admin-only edit controls -->
           <div class="menu-items" id="menuItems"></div>
+          <div id="menuEmptyState" class="empty-state hidden">
+            No menu items available. Please add them in <a href="menu-recipes.html">Menu Recipes</a>.
+          </div>
         </div>
 
         <!-- Cart Section -->
         <div class="cart-panel">
           <h2>Cart</h2>
           <div class="cart-list" id="cartList"></div>
+          <div id="cartEmptyState" class="empty-state">Your cart is empty</div>
           <p class="cart-total">Total: <span id="cartTotal">RM0.00</span></p>
           <input type="text" id="customerName" placeholder="Customer name (optional)" />
           <textarea id="orderNote" placeholder="Add notes..."></textarea>
