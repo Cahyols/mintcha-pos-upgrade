@@ -75,7 +75,30 @@
     </section>
   </div>
 
-  <!-- Modals omitted for brevity -->
+<!-- === Payment Modal === -->
+  <div id="paymentModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closePaymentModal" class="close">&times;</span>
+      <h3>Select Payment Method</h3>
+      <div class="payment-options">
+        <button class="payment-btn" data-method="Cash">💵 Cash</button>
+        <button class="payment-btn" data-method="QR Code">📱 QR Code</button>
+        <button class="payment-btn" data-method="TNG eWallet">🧧 TNG eWallet</button>
+        <button class="payment-btn" data-method="Card">💳 Card</button>
+      </div>
+    </div>
+  </div>
+
+<!-- ✅ Receipt Modal -->
+<div id="receiptModal" class="modal hidden">
+  <div id="receiptContent"></div>
+</div>
+
+
+  <!-- ✅ Receipt Modal -->
+  <div id="receiptModal" class="modal hidden">
+    <div id="receiptContent"></div>
+  </div>
 
   <!-- === Scripts === -->
   <script src="js/common.js"></script>

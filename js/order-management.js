@@ -25,7 +25,6 @@ const discountOptions = document.querySelectorAll(".discount-option");
 const removeDiscountBtn = document.getElementById("removeDiscountBtn"); // optional remove discount button
 
 // === Render Menu Items ===
-// In order-management.js
 function renderMenu(editMode = false) {
   sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
   menuContainer.innerHTML = "";
@@ -44,8 +43,6 @@ function renderMenu(editMode = false) {
     menuContainer.appendChild(div);
   });
 }
-
-
 
 // === Render Admin Edit Button ===
 function renderPriceEditorIfAdmin() {
@@ -106,7 +103,7 @@ function decreaseQty(index) {
   updateCart();
 }
 
-// === Update Cart & Show Subtotal | Discount | Total ===
+// === Update Cart ===
 function updateCart() {
   cartList.innerHTML = "";
   let subtotal = 0;
@@ -133,51 +130,41 @@ function updateCart() {
     cartList.appendChild(div);
   });
 
-  // === Apply Discount ===
   let discountAmount = 0;
-  if (appliedDiscount) {
-    if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
-    if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
-    if (appliedDiscount === "Buy 1 Free 1") {
-      let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-      let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
-      for (let i = 0; i < freeCount; i++) {
-        discountAmount += sortedItems[i % sortedItems.length].price;
-      }
+  if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
+  if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
+  if (appliedDiscount === "Buy 1 Free 1") {
+    let sortedItems = [...cart].sort((a, b) => a.price - b.price);
+    let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
+    for (let i = 0; i < freeCount; i++) {
+      discountAmount += sortedItems[i % sortedItems.length].price;
     }
   }
 
   const total = subtotal - discountAmount;
 
-  // === Display Subtotal | Discount | Total ===
-  let totalText = "";
-if (appliedDiscount) {
-  totalText = `Subtotal: RM${subtotal.toFixed(2)} | Discount: ${appliedDiscount} (-RM${discountAmount.toFixed(2)}) | Total: RM${total.toFixed(2)}`;
-} else {
-  totalText = `Total: RM${total.toFixed(2)}`;
-}
-
-
-  cartTotal.textContent = totalText;
+  if (appliedDiscount) {
+    cartTotal.textContent = `Subtotal: RM${subtotal.toFixed(2)} | Discount: ${appliedDiscount} (-RM${discountAmount.toFixed(2)}) | Total: RM${total.toFixed(2)}`;
+  } else {
+    cartTotal.textContent = `Total: RM${total.toFixed(2)}`;
+  }
 }
 
 // === Discount Modal Handling ===
 discountBtn?.addEventListener("click", () => {
-  discountModal.style.display = "flex"; // always show modal
+  discountModal.style.display = "flex";
 });
 
 closeDiscountModal?.addEventListener("click", () => {
   discountModal.style.display = "none";
 });
 
-// Discount option buttons
 discountOptions.forEach(button => {
   button.addEventListener("click", () => {
     if (appliedDiscount) {
       alert(`A discount (${appliedDiscount}) is already applied! Remove it first.`);
       return;
     }
-
     const type = button.dataset.type;
     switch (type) {
       case "buy1free1": appliedDiscount = "Buy 1 Free 1"; break;
@@ -185,25 +172,22 @@ discountOptions.forEach(button => {
       case "10off": appliedDiscount = "10% Off"; break;
       default: appliedDiscount = null;
     }
-
-    updateCart(); // recalc total
+    updateCart();
     alert(`${appliedDiscount} applied!`);
-    discountModal.style.display = "none"; // close modal after selection
+    discountModal.style.display = "none";
   });
 });
 
-// Remove discount button
 removeDiscountBtn?.addEventListener("click", () => {
   if (!appliedDiscount) {
     alert("No discount applied.");
     return;
   }
   appliedDiscount = null;
-  updateCart(); // recalc total
+  updateCart();
   alert("Discount removed.");
-  discountModal.style.display = "flex"; // reopen modal to select again
+  discountModal.style.display = "flex";
 });
-
 
 // === Cancel Order ===
 cancelOrder?.addEventListener("click", () => {
@@ -216,7 +200,6 @@ function resetDiscount() {
   appliedDiscount = null;
 }
 
-// === Order ID Generator ===
 function generateOrderId() {
   const today = new Date().toISOString().split("T")[0];
   const key = `mintcha_order_id_${today}`;
@@ -226,155 +209,7 @@ function generateOrderId() {
   return `ORD-${String(currentNumber).padStart(4, "0")}`;
 }
 
-// === Proceed Payment Modal Open ===
-proceedPayment?.addEventListener("click", () => {
-  if (cart.length === 0) {
-    alert("Cart is empty!");
-    return;
-  }
-  paymentModal.style.display = "flex";
-});
-
-// === Close Payment Modal ===
-closePaymentModal?.addEventListener("click", () => {
-  paymentModal.style.display = "none";
-});
-
-// === Payment Processing ===
-paymentButtons.forEach(button => {
-  button.addEventListener("click", () => {
-    const method = button.dataset.method;
-    const customer = document.getElementById("customerName").value || "Walk-in";
-    const note = document.getElementById("orderNote").value;
-    const orderId = generateOrderId();
-    const now = new Date();
-    const dateStr = now.toISOString();
-    const cashier = localStorage.getItem("mintchaUser") || "Unknown";
-    const stock = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
-    const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
-
-    const missingItems = [];
-
-    cart.forEach(cartItem => {
-      const menuItem = menuItems.find(m => m.name === cartItem.name);
-      const recipe = menuItem?.ingredients || [];
-      recipe.forEach(ingredient => {
-        const stockItem = stock.find(s => s.name === ingredient.name);
-        const requiredQty = ingredient.qty * cartItem.qty;
-        if (!stockItem) missingItems.push(`${ingredient.name} (missing from stock)`);
-        else if (stockItem.quantity < requiredQty)
-          missingItems.push(`${ingredient.name} (needed: ${requiredQty}, available: ${stockItem.quantity})`);
-      });
-    });
-
-    if (missingItems.length) {
-      alert("❌ Cannot complete the order. Missing ingredients:\n\n- " + missingItems.join("\n- "));
-      return;
-    }
-
-    // Deduct Ingredients
-    cart.forEach(cartItem => {
-      const menuItem = menuItems.find(m => m.name === cartItem.name);
-      const recipe = menuItem?.ingredients || [];
-      recipe.forEach(ingredient => {
-        const stockItem = stock.find(s => s.name === ingredient.name);
-        if (stockItem) stockItem.quantity -= ingredient.qty * cartItem.qty;
-      });
-    });
-
-    localStorage.setItem("mintcha_stock", JSON.stringify(stock));
-
-    // Track Daily Usage
-    const usageData = JSON.parse(localStorage.getItem("mintcha_usage") || "{}");
-    const todayKey = dateStr.split("T")[0];
-    if (!usageData[todayKey]) usageData[todayKey] = {};
-
-    cart.forEach(cartItem => {
-      const menuItem = menuItems.find(m => m.name === cartItem.name);
-      const recipe = menuItem?.ingredients || [];
-      recipe.forEach(ingredient => {
-        if (!usageData[todayKey][ingredient.name]) usageData[todayKey][ingredient.name] = { total: 0, unit: ingredient.unit || "unit" };
-        usageData[todayKey][ingredient.name].total += ingredient.qty * cartItem.qty;
-      });
-    });
-
-    localStorage.setItem("mintcha_usage", JSON.stringify(usageData));
-
-    // Calculate Total & Apply Discount
-    let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-    let discountAmount = 0;
-    if (appliedDiscount) {
-      if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
-      if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
-      if (appliedDiscount === "Buy 1 Free 1") {
-        let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-        let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
-        for (let i = 0; i < freeCount; i++) discountAmount += sortedItems[i % sortedItems.length].price;
-      }
-    }
-    let total = subtotal - discountAmount;
-
-    // Generate Receipt
-    const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
-
-    receiptContent.innerHTML = `
-      <div class="receipt-brand">🍃 Mintcha</div>
-      <div class="receipt-header">
-        <div><strong>${dateStr}</strong></div>
-        <div>Order ID: ${orderId}</div>
-        <div>Cashier: ${cashier}</div>
-      </div>
-      <div class="receipt-body">
-        ${itemList}
-        <div><em>Note:</em> ${note || '-'}</div>
-        <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
-        <div><strong>Payment:</strong> ${method}</div>
-      </div>
-      <div class="receipt-footer">
-        <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
-        <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
-        <strong>Total:</strong> RM${total.toFixed(2)}<br>
-        <div class="receipt-barcode"></div>
-        <div>#TeamRumput VS #TeamMint 💚</div>
-        <button id="closeReceiptModal">OK</button>
-      </div>
-    `;
-
-    const sale = {
-      id: orderId,
-      date: dateStr,
-      cashier,
-      customer,
-      note,
-      items: [...cart],
-      paymentMethod: method,
-      subtotal,
-      discountType: appliedDiscount || "None",
-      discountAmount,
-      total,
-      status: "Pending"
-    };
-
-    const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
-    allSales.unshift(sale);
-    localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
-
-    cart = [];
-    resetDiscount();
-    updateCart();
-    document.getElementById("customerName").value = "";
-    document.getElementById("orderNote").value = "";
-    paymentModal.style.display = "none";
-
-    document.getElementById("closeReceiptModal").onclick = () => {
-      receiptModal.style.display = "none";
-    };
-
-    receiptModal.style.display = "flex";
-  });
-});
-
-// === Init ===
+// === INIT ===
 document.addEventListener("DOMContentLoaded", () => {
   renderMenu();
   renderPriceEditorIfAdmin();
@@ -390,4 +225,145 @@ document.addEventListener("DOMContentLoaded", () => {
   if (cashierDisplay) cashierDisplay.textContent = user;
 
   updateCart();
+
+  // ✅ All payment-related event listeners are added AFTER DOM is loaded
+  proceedPayment.addEventListener("click", () => {
+    if (cart.length === 0) {
+      alert("Cart is empty!");
+      return;
+    }
+    paymentModal.style.display = "flex";
+  });
+
+  closePaymentModal.addEventListener("click", () => {
+    paymentModal.style.display = "none";
+  });
+
+  paymentButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      const method = button.dataset.method;
+      const customer = document.getElementById("customerName").value || "Walk-in";
+      const note = document.getElementById("orderNote").value;
+      const orderId = generateOrderId();
+      const now = new Date();
+      const dateStr = now.toISOString();
+      const cashier = localStorage.getItem("mintchaUser") || "Unknown";
+      const stock = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
+      const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
+
+      // Check stock
+      const missingItems = [];
+      cart.forEach(cartItem => {
+        const menuItem = menuItems.find(m => m.name === cartItem.name);
+        const recipe = menuItem?.ingredients || [];
+        recipe.forEach(ingredient => {
+          const stockItem = stock.find(s => s.name === ingredient.name);
+          const requiredQty = ingredient.qty * cartItem.qty;
+          if (!stockItem) missingItems.push(`${ingredient.name} (missing from stock)`);
+          else if (stockItem.quantity < requiredQty)
+            missingItems.push(`${ingredient.name} (needed: ${requiredQty}, available: ${stockItem.quantity})`);
+        });
+      });
+
+      if (missingItems.length) {
+        alert("❌ Cannot complete the order. Missing ingredients:\n\n- " + missingItems.join("\n- "));
+        return;
+      }
+
+      // Deduct Ingredients
+      cart.forEach(cartItem => {
+        const menuItem = menuItems.find(m => m.name === cartItem.name);
+        const recipe = menuItem?.ingredients || [];
+        recipe.forEach(ingredient => {
+          const stockItem = stock.find(s => s.name === ingredient.name);
+          if (stockItem) stockItem.quantity -= ingredient.qty * cartItem.qty;
+        });
+      });
+      localStorage.setItem("mintcha_stock", JSON.stringify(stock));
+
+      // Track Daily Usage
+      const usageData = JSON.parse(localStorage.getItem("mintcha_usage") || "{}");
+      const todayKey = dateStr.split("T")[0];
+      if (!usageData[todayKey]) usageData[todayKey] = {};
+      cart.forEach(cartItem => {
+        const menuItem = menuItems.find(m => m.name === cartItem.name);
+        const recipe = menuItem?.ingredients || [];
+        recipe.forEach(ingredient => {
+          if (!usageData[todayKey][ingredient.name]) usageData[todayKey][ingredient.name] = { total: 0, unit: ingredient.unit || "unit" };
+          usageData[todayKey][ingredient.name].total += ingredient.qty * cartItem.qty;
+        });
+      });
+      localStorage.setItem("mintcha_usage", JSON.stringify(usageData));
+
+      // Totals
+      let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+      let discountAmount = 0;
+      if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
+      if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
+      if (appliedDiscount === "Buy 1 Free 1") {
+        let sortedItems = [...cart].sort((a, b) => a.price - b.price);
+        let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
+        for (let i = 0; i < freeCount; i++) discountAmount += sortedItems[i % sortedItems.length].price;
+      }
+      let total = subtotal - discountAmount;
+
+      // Receipt
+      const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
+      receiptContent.innerHTML = `
+        <div class="receipt-brand">🍃 Mintcha</div>
+        <div class="receipt-header">
+          <div><strong>${dateStr}</strong></div>
+          <div>Order ID: ${orderId}</div>
+          <div>Cashier: ${cashier}</div>
+        </div>
+        <div class="receipt-body">
+          ${itemList}
+          <div><em>Note:</em> ${note || '-'}</div>
+          <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
+          <div><strong>Payment:</strong> ${method}</div>
+        </div>
+        <div class="receipt-footer">
+          <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
+          <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
+          <strong>Total:</strong> RM${total.toFixed(2)}<br>
+          <div class="receipt-barcode"></div>
+          <div>#TeamRumput VS #TeamMint 💚</div>
+          <button id="closeReceiptModal">OK</button>
+        </div>
+      `;
+
+      // Save sale
+      const sale = {
+        id: orderId,
+        date: dateStr,
+        cashier,
+        customer,
+        note,
+        items: [...cart],
+        paymentMethod: method,
+        subtotal,
+        discountType: appliedDiscount || "None",
+        discountAmount,
+        total,
+        status: "Pending"
+      };
+
+      const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+      allSales.unshift(sale);
+      localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
+
+      cart = [];
+      resetDiscount();
+      updateCart();
+      document.getElementById("customerName").value = "";
+      document.getElementById("orderNote").value = "";
+      paymentModal.style.display = "none";
+
+      document.getElementById("closeReceiptModal").onclick = () => {
+        receiptModal.style.display = "none";
+      };
+
+      receiptModal.style.display = "flex";
+    });
+  });
 });
