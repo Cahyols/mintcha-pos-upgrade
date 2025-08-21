@@ -166,12 +166,22 @@ discountOptions.forEach(button => {
       return;
     }
     const type = button.dataset.type;
-    switch (type) {
-      case "buy1free1": appliedDiscount = "Buy 1 Free 1"; break;
-      case "5off": appliedDiscount = "5% Off"; break;
-      case "10off": appliedDiscount = "10% Off"; break;
-      default: appliedDiscount = null;
-    }
+const totalQtyInCart = cart.reduce((sum, i) => sum + i.qty, 0);
+
+if (type === "buy1free1") {
+  if (totalQtyInCart < 2) {
+    alert("❌ Buy 1 Free 1 requires at least 2 items in the cart.");
+    return;
+  }
+  appliedDiscount = "Buy 1 Free 1";
+} else if (type === "5off") {
+  appliedDiscount = "5% Off";
+} else if (type === "10off") {
+  appliedDiscount = "10% Off";
+} else {
+  appliedDiscount = null;
+}
+
     updateCart();
     alert(`${appliedDiscount} applied!`);
     discountModal.style.display = "none";
