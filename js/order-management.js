@@ -132,14 +132,14 @@ function updateCart() {
 
   let discountAmount = 0;
   if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
-  if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
-  if (appliedDiscount === "Buy 1 Free 1") {
-    let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-    let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
-    for (let i = 0; i < freeCount; i++) {
-      discountAmount += sortedItems[i % sortedItems.length].price;
-    }
-  }
+if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
+if (appliedDiscount === "Student Discount (10%)") discountAmount = subtotal * 0.10; // ✅ new
+if (appliedDiscount === "Buy 1 Free 1") {
+  let sortedItems = [...cart].sort((a, b) => a.price - b.price);
+  let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
+  for (let i = 0; i < freeCount; i++) discountAmount += sortedItems[i % sortedItems.length].price;
+}
+
 
   const total = subtotal - discountAmount;
 
@@ -166,21 +166,23 @@ discountOptions.forEach(button => {
       return;
     }
     const type = button.dataset.type;
-const totalQtyInCart = cart.reduce((sum, i) => sum + i.qty, 0);
+    const totalQtyInCart = cart.reduce((sum, i) => sum + i.qty, 0);
 
-if (type === "buy1free1") {
-  if (totalQtyInCart < 2) {
-    alert("❌ Buy 1 Free 1 requires at least 2 items in the cart.");
-    return;
-  }
-  appliedDiscount = "Buy 1 Free 1";
-} else if (type === "5off") {
-  appliedDiscount = "5% Off";
-} else if (type === "10off") {
-  appliedDiscount = "10% Off";
-} else {
-  appliedDiscount = null;
-}
+    if (type === "buy1free1") {
+      if (totalQtyInCart < 2) {
+        alert("❌ Buy 1 Free 1 requires at least 2 items in the cart.");
+        return;
+      }
+      appliedDiscount = "Buy 1 Free 1";
+    } else if (type === "5off") {
+      appliedDiscount = "5% Off";
+    } else if (type === "10off") {
+      appliedDiscount = "10% Off";
+    } else if (type === "student10") {
+      appliedDiscount = "Student Discount (10%)";  // ✅ new discount
+    } else {
+      appliedDiscount = null;
+    }
 
     updateCart();
     alert(`${appliedDiscount} applied!`);
@@ -308,13 +310,17 @@ document.addEventListener("DOMContentLoaded", () => {
       // Totals
       let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
       let discountAmount = 0;
-      if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
-      if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
-      if (appliedDiscount === "Buy 1 Free 1") {
-        let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-        let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
-        for (let i = 0; i < freeCount; i++) discountAmount += sortedItems[i % sortedItems.length].price;
-      }
+if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
+if (appliedDiscount === "10% Off") discountAmount = subtotal * 0.10;
+if (appliedDiscount === "Student Discount (10%)") discountAmount = subtotal * 0.10; // ✅ new rule
+if (appliedDiscount === "Buy 1 Free 1") {
+  let sortedItems = [...cart].sort((a, b) => a.price - b.price);
+  let freeCount = Math.floor(cart.reduce((sum, i) => sum + i.qty, 0) / 2);
+  for (let i = 0; i < freeCount; i++) {
+    discountAmount += sortedItems[i % sortedItems.length].price;
+  }
+}
+
       let total = subtotal - discountAmount;
 
       // Receipt
