@@ -180,6 +180,8 @@ discountOptions.forEach(button => {
       appliedDiscount = "10% Off";
     } else if (type === "student10") {
       appliedDiscount = "Student Discount (10%)";  // ✅ new discount
+      } else if (type === "hari3") {
+  appliedDiscount = "Hari Malaysia – RM3 Off";  // ✅ new
     } else {
       appliedDiscount = null;
     }
