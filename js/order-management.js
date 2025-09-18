@@ -38,8 +38,24 @@ function renderMenu(editMode = false) {
   sampleMenu.forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "menu-item";
-    div.innerHTML = `<strong>${item.name}</strong><br>RM${parseFloat(item.price).toFixed(2)}`;
-    div.onclick = () => addToCart(index);
+
+    if (editMode) {
+      // Show input box for editing price
+      div.innerHTML = `
+        <strong>${item.name}</strong><br>
+        RM <input 
+              type="number" 
+              step="0.01" 
+              value="${parseFloat(item.price).toFixed(2)}" 
+              class="price-input" 
+              data-index="${index}">
+      `;
+    } else {
+      // Normal view
+      div.innerHTML = `<strong>${item.name}</strong><br>RM${parseFloat(item.price).toFixed(2)}`;
+      div.onclick = () => addToCart(index);
+    }
+
     menuContainer.appendChild(div);
   });
 }
