@@ -274,7 +274,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const note = document.getElementById("orderNote").value;
       const orderId = generateOrderId();
       const now = new Date();
-      const dateStr = now.toISOString();
+const options = { 
+  year: "numeric", 
+  month: "2-digit", 
+  day: "2-digit", 
+  hour: "2-digit", 
+  minute: "2-digit", 
+  second: "2-digit", 
+  hour12: false 
+};
+const dateStr = now.toLocaleString("en-MY", options); 
+
       const cashier = localStorage.getItem("mintchaUser") || "Unknown";
       const stock = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
       const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
