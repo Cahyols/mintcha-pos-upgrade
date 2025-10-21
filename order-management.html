@@ -75,7 +75,7 @@
     </section>
   </div>
 
-<!-- === Payment Modal === -->
+  <!-- === Payment Modal === -->
   <div id="paymentModal" class="modal hidden">
     <div class="modal-content">
       <span id="closePaymentModal" class="close">&times;</span>
@@ -89,35 +89,37 @@
     </div>
   </div>
 
-<!-- ✅ Receipt Modal -->
-<div id="receiptModal" class="modal hidden">
-  <div id="receiptContent"></div>
-</div>
-
-
   <!-- ✅ Receipt Modal -->
   <div id="receiptModal" class="modal hidden">
     <div id="receiptContent"></div>
   </div>
 
   <!-- ✅ Discount Modal -->
-<div id="discountModal" class="modal hidden">
-  <div class="modal-content">
-    <span id="closeDiscountModal" class="close">&times;</span>
-    <h3>Select Discount</h3>
-    <div class="discount-options">
-      <button class="discount-option" data-type="5off">5% Off</button>
-      <button class="discount-option" data-type="10off">10% Off</button>
-      <button class="discount-option" data-type="buy1free1">Buy 1 Free 1</button>
-      <button class="discount-option" data-type="student10">🎓 Student Discount (10%)</button>
+  <div id="discountModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeDiscountModal" class="close">&times;</span>
+      <h3>Select Discount</h3>
+
+      <div class="discount-options">
+        <button class="discount-option" data-type="buy2get10">🛒 Buy 2 Get 10% Off</button>
+        <button class="discount-option" data-type="ig1">📸 IG RM1 Off</button>
+        <button class="discount-option" data-type="tiktok1">🎬 TikTok RM1 Off</button>
+        <button class="discount-option" data-type="medsos2">🌐 Med Sos RM2 Off</button>
+        <hr>
+        <button class="discount-option" data-type="buy1free1">🎁 Buy 1 Free 1</button>
+        <button class="discount-option" data-type="5off">5% Off</button>
+        <button class="discount-option" data-type="10off">10% Off</button>
+        <button class="discount-option" data-type="student10">🎓 Student Discount (10%)</button>
+      </div>
+
+      <button id="removeDiscountBtn">Remove Discount</button>
     </div>
-    <button id="removeDiscountBtn">Remove Discount</button>
   </div>
-</div>
 
   <!-- === Scripts === -->
   <script src="js/common.js"></script>
   <script src="js/order-management.js"></script>
+  
   <script>
     // === Live menu update when new drink is added in another tab/page ===
     window.addEventListener('storage', (event) => {

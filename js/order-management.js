@@ -1,7 +1,10 @@
 let sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
+
+// === Cart & Discount State ===
 let cart = [];
 let appliedDiscount = null;
 
+// === DOM Elements ===
 const menuContainer = document.getElementById("menuItems");
 const priceControls = document.getElementById("priceControls");
 const menuEmptyState = document.getElementById("menuEmptyState");
@@ -13,13 +16,15 @@ const cancelOrder = document.getElementById("cancelOrder");
 const paymentModal = document.getElementById("paymentModal");
 const closePaymentModal = document.getElementById("closePaymentModal");
 const paymentButtons = document.querySelectorAll(".payment-btn");
+const receiptModal = document.getElementById("receiptModal");
+const receiptContent = document.getElementById("receiptContent");
 const discountBtn = document.getElementById("discountBtn");
 const discountModal = document.getElementById("discountModal");
 const closeDiscountModal = document.getElementById("closeDiscountModal");
 const discountOptions = document.querySelectorAll(".discount-option");
 const removeDiscountBtn = document.getElementById("removeDiscountBtn");
 
-// === MENU RENDER ===
+// === Render Menu Items ===
 function renderMenu(editMode = false) {
   sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
   menuContainer.innerHTML = "";
@@ -37,8 +42,12 @@ function renderMenu(editMode = false) {
     if (editMode) {
       div.innerHTML = `
         <strong>${item.name}</strong><br>
-        RM <input type="number" step="0.01" value="${parseFloat(item.price).toFixed(2)}"
-        class="price-input" data-index="${index}">
+        RM <input 
+              type="number" 
+              step="0.01" 
+              value="${parseFloat(item.price).toFixed(2)}" 
+              class="price-input" 
+              data-index="${index}">
       `;
     } else {
       div.innerHTML = `<strong>${item.name}</strong><br>RM${parseFloat(item.price).toFixed(2)}`;
@@ -49,6 +58,7 @@ function renderMenu(editMode = false) {
   });
 }
 
+// === Render Admin Edit Button ===
 function renderPriceEditorIfAdmin() {
   const role = localStorage.getItem("mintchaRole");
   if (role === "admin") {
@@ -57,6 +67,7 @@ function renderPriceEditorIfAdmin() {
 
     document.getElementById("toggleEditPrices").addEventListener("click", () => {
       editMode = !editMode;
+
       if (editMode) {
         renderMenu(true);
         document.getElementById("toggleEditPrices").textContent = "💾 Save Prices";
@@ -75,25 +86,47 @@ function renderPriceEditorIfAdmin() {
   }
 }
 
-// === CART HANDLERS ===
+// === Cart Functions ===
 function addToCart(index) {
   const selected = sampleMenu[index];
   const existing = cart.find(i => i.name === selected.name);
-  if (existing) existing.qty++;
-  else cart.push({ name: selected.name, price: selected.price, qty: 1 });
+  if (existing) {
+    existing.qty++;
+  } else {
+    cart.push({ name: selected.name, price: selected.price, qty: 1 });
+  }
   updateCart();
 }
 
-function removeFromCart(i) { cart.splice(i, 1); updateCart(); }
-function increaseQty(i) { cart[i].qty++; updateCart(); }
-function decreaseQty(i) { cart[i].qty > 1 ? cart[i].qty-- : cart.splice(i, 1); updateCart(); }
+function removeFromCart(index) {
+  cart.splice(index, 1);
+  updateCart();
+}
 
+function increaseQty(index) {
+  cart[index].qty++;
+  updateCart();
+}
+
+function decreaseQty(index) {
+  if (cart[index].qty > 1) {
+    cart[index].qty--;
+  } else {
+    cart.splice(index, 1);
+  }
+  updateCart();
+}
+
+// === Update Cart ===
 function updateCart() {
   cartList.innerHTML = "";
   let subtotal = 0;
 
-  if (!cart.length) cartEmptyState.classList.remove("hidden");
-  else cartEmptyState.classList.add("hidden");
+  if (!cart.length) {
+    cartEmptyState.classList.remove("hidden");
+  } else {
+    cartEmptyState.classList.add("hidden");
+  }
 
   cart.forEach((item, idx) => {
     subtotal += item.price * item.qty;
@@ -112,35 +145,97 @@ function updateCart() {
   });
 
   let discountAmount = 0;
-  if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
-  if (appliedDiscount === "10% Off" || appliedDiscount === "Student Discount (10%)") discountAmount = subtotal * 0.10;
-  if (appliedDiscount === "Buy 1 Free 1") {
-    let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-    let freeCount = Math.floor(cart.reduce((s, i) => s + i.qty, 0) / 2);
-    for (let i = 0; i < freeCount; i++) discountAmount += sortedItems[i % sortedItems.length].price;
+  const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
+
+  switch (appliedDiscount) {
+    case "5% Off":
+      discountAmount = subtotal * 0.05;
+      break;
+    case "10% Off":
+      discountAmount = subtotal * 0.10;
+      break;
+    case "Student Discount (10%)":
+      discountAmount = subtotal * 0.10;
+      break;
+    case "Buy 1 Free 1":
+      let sortedItems = [...cart].sort((a, b) => a.price - b.price);
+      let freeCount = Math.floor(totalQty / 2);
+      for (let i = 0; i < freeCount; i++)
+        discountAmount += sortedItems[i % sortedItems.length].price;
+      break;
+    case "Buy 2 Get 10% Off":
+      if (totalQty >= 2) discountAmount = subtotal * 0.10;
+      break;
+    case "IG RM1 Off":
+      discountAmount = 1;
+      break;
+    case "TikTok RM1 Off":
+      discountAmount = 1;
+      break;
+    case "Med Sos RM2 Off":
+      discountAmount = 2;
+      break;
   }
 
+  if (discountAmount > subtotal) discountAmount = subtotal;
+
   const total = subtotal - discountAmount;
-  cartTotal.textContent = appliedDiscount
-    ? `Subtotal: RM${subtotal.toFixed(2)} | Discount: ${appliedDiscount} (-RM${discountAmount.toFixed(2)}) | Total: RM${total.toFixed(2)}`
-    : `Total: RM${total.toFixed(2)}`;
+
+  if (appliedDiscount) {
+    cartTotal.textContent = `Subtotal: RM${subtotal.toFixed(2)} | Discount: ${appliedDiscount} (-RM${discountAmount.toFixed(2)}) | Total: RM${total.toFixed(2)}`;
+  } else {
+    cartTotal.textContent = `Total: RM${total.toFixed(2)}`;
+  }
 }
 
-// === DISCOUNTS ===
-discountBtn?.addEventListener("click", () => discountModal.style.display = "flex");
-closeDiscountModal?.addEventListener("click", () => discountModal.style.display = "none");
+// === Discount Modal Handling ===
+discountBtn?.addEventListener("click", () => {
+  discountModal.style.display = "flex";
+});
+
+closeDiscountModal?.addEventListener("click", () => {
+  discountModal.style.display = "none";
+});
 
 discountOptions.forEach(button => {
   button.addEventListener("click", () => {
-    if (appliedDiscount) return alert(`A discount (${appliedDiscount}) is already applied! Remove it first.`);
+    if (appliedDiscount) {
+      alert(`A discount (${appliedDiscount}) is already applied! Remove it first.`);
+      return;
+    }
+
     const type = button.dataset.type;
-    const qty = cart.reduce((sum, i) => sum + i.qty, 0);
-    if (type === "buy1free1" && qty < 2) return alert("❌ Buy 1 Free 1 requires at least 2 items.");
-    appliedDiscount =
-      type === "buy1free1" ? "Buy 1 Free 1" :
-      type === "5off" ? "5% Off" :
-      type === "10off" ? "10% Off" :
-      type === "student10" ? "Student Discount (10%)" : null;
+    const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
+
+    switch (type) {
+      case "buy1free1":
+        if (totalQty < 2) return alert("❌ Buy 1 Free 1 requires at least 2 items.");
+        appliedDiscount = "Buy 1 Free 1";
+        break;
+      case "buy2get10":
+        if (totalQty < 2) return alert("❌ Buy 2 Get 10% Off requires at least 2 items.");
+        appliedDiscount = "Buy 2 Get 10% Off";
+        break;
+      case "5off":
+        appliedDiscount = "5% Off";
+        break;
+      case "10off":
+        appliedDiscount = "10% Off";
+        break;
+      case "student10":
+        appliedDiscount = "Student Discount (10%)";
+        break;
+      case "ig1":
+        appliedDiscount = "IG RM1 Off";
+        break;
+      case "tiktok1":
+        appliedDiscount = "TikTok RM1 Off";
+        break;
+      case "medsos2":
+        appliedDiscount = "Med Sos RM2 Off";
+        break;
+    }
+
     updateCart();
     alert(`${appliedDiscount} applied!`);
     discountModal.style.display = "none";
@@ -155,22 +250,27 @@ removeDiscountBtn?.addEventListener("click", () => {
   discountModal.style.display = "flex";
 });
 
+// === Cancel Order ===
 cancelOrder?.addEventListener("click", () => {
   cart = [];
-  appliedDiscount = null;
+  resetDiscount();
   updateCart();
 });
 
-// === PAYMENT ===
+function resetDiscount() {
+  appliedDiscount = null;
+}
+
 function generateOrderId() {
   const today = new Date().toISOString().split("T")[0];
   const key = `mintcha_order_id_${today}`;
-  let num = parseInt(localStorage.getItem(key) || "0", 10);
-  num++;
-  localStorage.setItem(key, num);
-  return `ORD-${String(num).padStart(4, "0")}`;
+  let currentNumber = parseInt(localStorage.getItem(key) || "0", 10);
+  currentNumber++;
+  localStorage.setItem(key, currentNumber);
+  return `ORD-${String(currentNumber).padStart(4, "0")}`;
 }
 
+// === INIT ===
 document.addEventListener("DOMContentLoaded", () => {
   renderMenu();
   renderPriceEditorIfAdmin();
@@ -188,11 +288,13 @@ document.addEventListener("DOMContentLoaded", () => {
   updateCart();
 
   proceedPayment.addEventListener("click", () => {
-    if (!cart.length) return alert("Cart is empty!");
+    if (cart.length === 0) return alert("Cart is empty!");
     paymentModal.style.display = "flex";
   });
 
-  closePaymentModal.addEventListener("click", () => paymentModal.style.display = "none");
+  closePaymentModal.addEventListener("click", () => {
+    paymentModal.style.display = "none";
+  });
 
   paymentButtons.forEach(button => {
     button.addEventListener("click", () => {
@@ -203,21 +305,64 @@ document.addEventListener("DOMContentLoaded", () => {
       const now = new Date();
       const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
       const dateStr = now.toLocaleString("en-MY", options);
-      const cashier = user;
 
+      const cashier = localStorage.getItem("mintchaUser") || "Unknown";
+      const stock = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
+      const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
+
+      // Totals
       let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
       let discountAmount = 0;
-      if (appliedDiscount === "5% Off") discountAmount = subtotal * 0.05;
-      if (appliedDiscount === "10% Off" || appliedDiscount === "Student Discount (10%)") discountAmount = subtotal * 0.10;
-      if (appliedDiscount === "Buy 1 Free 1") {
-        let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-        let freeCount = Math.floor(cart.reduce((s, i) => s + i.qty, 0) / 2);
-        for (let i = 0; i < freeCount; i++) discountAmount += sortedItems[i % sortedItems.length].price;
+      const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
+
+      switch (appliedDiscount) {
+        case "5% Off": discountAmount = subtotal * 0.05; break;
+        case "10% Off": discountAmount = subtotal * 0.10; break;
+        case "Student Discount (10%)": discountAmount = subtotal * 0.10; break;
+        case "Buy 1 Free 1":
+          let sortedItems = [...cart].sort((a, b) => a.price - b.price);
+          let freeCount = Math.floor(totalQty / 2);
+          for (let i = 0; i < freeCount; i++)
+            discountAmount += sortedItems[i % sortedItems.length].price;
+          break;
+        case "Buy 2 Get 10% Off":
+          if (totalQty >= 2) discountAmount = subtotal * 0.10;
+          break;
+        case "IG RM1 Off": discountAmount = 1; break;
+        case "TikTok RM1 Off": discountAmount = 1; break;
+        case "Med Sos RM2 Off": discountAmount = 2; break;
       }
 
+      if (discountAmount > subtotal) discountAmount = subtotal;
       const total = subtotal - discountAmount;
 
-      const order = {
+      // Receipt
+      const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
+      receiptContent.innerHTML = `
+        <div class="receipt-brand">🍃 Mintcha</div>
+        <div class="receipt-header">
+          <div><strong>${dateStr}</strong></div>
+          <div>Order ID: ${orderId}</div>
+          <div>Cashier: ${cashier}</div>
+        </div>
+        <div class="receipt-body">
+          ${itemList}
+          <div><em>Note:</em> ${note || '-'}</div>
+          <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
+          <div><strong>Payment:</strong> ${method}</div>
+        </div>
+        <div class="receipt-footer">
+          <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
+          <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
+          <strong>Total:</strong> RM${total.toFixed(2)}<br>
+          <div class="receipt-barcode"></div>
+          <div>#TeamRumput VS #TeamMint 💚</div>
+          <button id="closeReceiptModal">OK</button>
+        </div>
+      `;
+
+      // Save sale
+      const sale = {
         id: orderId,
         date: dateStr,
         cashier,
@@ -233,18 +378,21 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
-      allSales.unshift(order);
+      allSales.unshift(sale);
       localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
 
       cart = [];
-      appliedDiscount = null;
+      resetDiscount();
       updateCart();
       document.getElementById("customerName").value = "";
       document.getElementById("orderNote").value = "";
       paymentModal.style.display = "none";
 
-      // === Call receipt.js function
-      generateReceipt(order);
+      document.getElementById("closeReceiptModal").onclick = () => {
+        receiptModal.style.display = "none";
+      };
+
+      receiptModal.style.display = "flex";
     });
   });
 });
