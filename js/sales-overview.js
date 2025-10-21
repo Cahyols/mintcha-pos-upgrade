@@ -76,24 +76,81 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // --- Safe Date Parser (Local-Time Aware) ---
+  function parseDateSafe(dateString) {
+    if (!dateString) return null;
+
+    // 1️⃣ Try built-in parser first (handles ISO)
+    let d = new Date(dateString);
+    if (!isNaN(d.getTime())) return d;
+
+    // 2️⃣ Try DD/MM/YYYY or DD-MM-YYYY (with optional time)
+    const dtMatch = dateString.match(
+      /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[ ,T]*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM|am|pm))?)?/
+    );
+    if (dtMatch) {
+      let [, day, month, year, hour, minute, second, ampm] = dtMatch;
+      day = parseInt(day, 10);
+      month = parseInt(month, 10) - 1;
+      year = parseInt(year, 10);
+      if (year < 100) year += 2000;
+
+      hour = hour ? parseInt(hour, 10) : 0;
+      minute = minute ? parseInt(minute, 10) : 0;
+      second = second ? parseInt(second, 10) : 0;
+
+      if (ampm) {
+        const up = ampm.toUpperCase();
+        if (up === "PM" && hour < 12) hour += 12;
+        if (up === "AM" && hour === 12) hour = 0;
+      }
+
+      // Create local time date
+      const localDate = new Date(year, month, day, hour, minute, second);
+      if (!isNaN(localDate.getTime())) return localDate;
+    }
+
+    // 3️⃣ Try ISO-like YYYY-MM-DD HH:MM
+    const isoParts = dateString.match(
+      /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{2}):?(\d{2})?)?/
+    );
+    if (isoParts) {
+      let [, y, m, d2, h, min, s] = isoParts;
+      y = parseInt(y, 10);
+      m = parseInt(m, 10) - 1;
+      d2 = parseInt(d2, 10);
+      h = h ? parseInt(h, 10) : 0;
+      min = min ? parseInt(min, 10) : 0;
+      s = s ? parseInt(s, 10) : 0;
+      const localDate = new Date(y, m, d2, h, min, s);
+      if (!isNaN(localDate.getTime())) return localDate;
+    }
+
+    return null;
+  }
+
+  // === Render Sales Table ===
   function renderSalesPage(page) {
     tableBody.innerHTML = "";
     const start = (page - 1) * pageSize;
     const pageSales = filteredSales.slice(start, start + pageSize);
 
     pageSales.forEach((sale, index) => {
-      if (!sale || !sale.date) return;
+      if (!sale) return;
 
-      const saleTime = new Date(sale.date);
-      if (isNaN(saleTime.getTime())) return;
+      let date = "-";
+      let time = "-";
+      const saleTime = parseDateSafe(sale.date);
 
-      const [date, time] = [
-        saleTime.toLocaleDateString(),
-        saleTime.toLocaleTimeString(),
-      ];
+      if (saleTime) {
+        date = saleTime.toLocaleDateString();
+        time = saleTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); // HH:MM only
+      } else if (sale.date) {
+        date = sale.date;
+      }
 
       const now = new Date();
-      const minutesElapsed = (now - saleTime) / 60000;
+      const minutesElapsed = saleTime ? (now - saleTime) / 60000 : 0;
       const isRefunded = sale.status === "Refunded";
       const refundedClass = isRefunded ? "refunded-row" : "";
       const allowRefund = !isRefunded && minutesElapsed >= 15 && minutesElapsed < 30;
@@ -103,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (isRefunded) {
         statusText = "Refunded";
-        statusBadge = `<span class="badge badge-refunded" title="${sale.refundReason || 'No reason provided'}">Refunded</span>`;
+        statusBadge = `<span class="badge badge-refunded" title="${sale.refundReason || "No reason provided"}">Refunded</span>`;
       } else if (minutesElapsed < 15) {
         statusText = "Preparing";
         statusBadge = `<span class="badge badge-preparing">Preparing</span>`;
@@ -112,25 +169,26 @@ document.addEventListener("DOMContentLoaded", () => {
         statusBadge = `<span class="badge badge-completed">Completed</span>`;
       }
 
-      // Store derived status for filtering
       sale._derivedStatus = statusText;
 
       const row = document.createElement("tr");
       row.className = refundedClass;
 
-      const itemList = sale.items.map(item => `<li>${item.qty} × ${item.name}</li>`).join("");
+      const itemList = (sale.items || [])
+        .map(item => `<li>${item.qty} × ${item.name}</li>`)
+        .join("");
 
       row.innerHTML = `
         <td>${start + index + 1}</td>
-        <td>${sale.id}</td>
+        <td>${sale.id || "-"}</td>
         <td>${date}</td>
         <td>${time}</td>
-        <td>${sale.cashier}</td>
+        <td>${sale.cashier || "-"}</td>
         <td>${sale.customer || "-"}</td>
         <td><ul>${itemList}</ul></td>
         <td>${sale.note || "-"}</td>
-        <td>RM${parseFloat(sale.total).toFixed(2)}</td>
-        <td>${sale.paymentMethod}</td>
+        <td>RM${parseFloat(sale.total || 0).toFixed(2)}</td>
+        <td>${sale.paymentMethod || "-"}</td>
         <td>${sale.discountType || "None"}</td>
       `;
 
@@ -154,7 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
               }
 
-              applyFilters(); // refresh with filters
+              applyFilters();
             }
           }
         };
@@ -186,51 +244,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-window.applyFilters = function () {
-  const allSales = loadSales();
+  window.applyFilters = function () {
+    const allSales = loadSales();
 
-  const dateStart = document.getElementById("fromDate").value;
-  const dateEnd = document.getElementById("toDate").value;
-  const cashier = document.getElementById("filterCashier").value.trim().toLowerCase();
-  const payment = document.getElementById("filterPayment").value.trim().toLowerCase();
-  const status = document.getElementById("filterStatus").value.trim().toLowerCase();
+    const dateStart = document.getElementById("fromDate").value;
+    const dateEnd = document.getElementById("toDate").value;
+    const cashier = document.getElementById("filterCashier").value.trim().toLowerCase();
+    const payment = document.getElementById("filterPayment").value.trim().toLowerCase();
+    const status = document.getElementById("filterStatus").value.trim().toLowerCase();
 
-  filteredSales = allSales.filter(sale => {
-    const saleDate = new Date(sale.date);
-    if (isNaN(saleDate)) return false;
+    filteredSales = allSales.filter(sale => {
+      const saleDateObj = parseDateSafe(sale.date);
+      const dateStr = saleDateObj ? saleDateObj.toISOString().split("T")[0] : null;
 
-    const dateStr = saleDate.toISOString().split("T")[0];
+      const matchStart = !dateStart || (dateStr && dateStr >= dateStart);
+      const matchEnd = !dateEnd || (dateStr && dateStr <= dateEnd);
+      const matchCashier = !cashier || (sale.cashier || "").toLowerCase() === cashier;
+      const normalizedPayment = (sale.paymentMethod || "").toLowerCase().trim();
+      const matchPayment = !payment || normalizedPayment === payment;
 
-    const matchStart = !dateStart || dateStr >= dateStart;
-    const matchEnd = !dateEnd || dateStr <= dateEnd;
-    const matchCashier = !cashier || (sale.cashier || "").toLowerCase() === cashier;
-
-    // Normalize and compare payment method
-    const normalizedPayment = (sale.paymentMethod || "").toLowerCase().trim();
-    const matchPayment = !payment || normalizedPayment === payment;
-
-    // Normalize and compare status
-    let derivedStatus = sale._derivedStatus;
-    if (!derivedStatus) {
-      if ((sale.status || "").toLowerCase() === "refunded") {
-        derivedStatus = "refunded";
-      } else {
-        const now = new Date();
-        const minutesElapsed = (now - saleDate) / 60000;
-        derivedStatus = minutesElapsed < 15 ? "preparing" : "completed";
+      let derivedStatus = sale._derivedStatus;
+      if (!derivedStatus) {
+        if ((sale.status || "").toLowerCase() === "refunded") {
+          derivedStatus = "refunded";
+        } else {
+          const now = new Date();
+          const minutesElapsed = saleDateObj ? (now - saleDateObj) / 60000 : 0;
+          derivedStatus = minutesElapsed < 15 ? "preparing" : "completed";
+        }
       }
-    }
+      const matchStatus = !status || derivedStatus.toLowerCase() === status;
 
-    const matchStatus = !status || derivedStatus.toLowerCase() === status;
+      return matchStart && matchEnd && matchCashier && matchPayment && matchStatus;
+    });
 
-    return matchStart && matchEnd && matchCashier && matchPayment && matchStatus;
-  });
-
-  currentPage = 1;
-  renderSalesPage(currentPage);
-  renderPagination();
-};
-
+    currentPage = 1;
+    renderSalesPage(currentPage);
+    renderPagination();
+  };
 
   window.resetFilters = function () {
     document.getElementById("fromDate").value = "";
@@ -244,25 +295,21 @@ window.applyFilters = function () {
     renderSalesPage(currentPage);
     renderPagination();
   };
-
-  // Auto-filter on filter changes
-  ["filterCashier", "filterPayment", "filterStatus", "fromDate", "toDate"].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener("change", applyFilters);
-  });
 });
 
 // === CSV Export Function ===
 function exportToCSV() {
   const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
   const rows = [
-    ["Order ID", "Date", "Cashier", "Customer", "Items", "Total", "Payment", "Status", "Refund Reason"]
+    ["Order ID", "Date", "Cashier", "Customer", "Items", "Total", "Payment", "Discount", "Status", "Refund Reason"]
   ];
 
   sales.forEach(s => {
-    const itemStr = s.items.map(i => `${i.qty}x${i.name}`).join(" | ");
+    const itemStr = (s.items || []).map(i => `${i.qty}x${i.name}`).join(" | ");
     const d = new Date(s.date);
-    const formattedDate = isNaN(d) ? s.date : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const formattedDate = isNaN(d)
+      ? s.date
+      : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
     rows.push([
       s.id,
