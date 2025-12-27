@@ -157,12 +157,16 @@ function updateCart() {
     case "Student Discount (10%)":
       discountAmount = subtotal * 0.10;
       break;
-    case "Buy 1 Free 1":
-      let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-      let freeCount = Math.floor(totalQty / 2);
-      for (let i = 0; i < freeCount; i++)
-        discountAmount += sortedItems[i % sortedItems.length].price;
-      break;
+    case "Buy 2 Free 1":
+  if (totalQty >= 3) {
+    const sortedItems = [...cart].sort((a, b) => a.price - b.price);
+    const freeCount = Math.floor(totalQty / 3);
+
+    for (let i = 0; i < freeCount; i++) {
+      discountAmount += sortedItems[i % sortedItems.length].price;
+    }
+  }
+  break;
     case "Buy 2 Get 10% Off":
       if (totalQty >= 2) discountAmount = subtotal * 0.10;
       break;
@@ -208,10 +212,11 @@ discountOptions.forEach(button => {
     const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
 
     switch (type) {
-      case "buy1free1":
-        if (totalQty < 2) return alert("❌ Buy 1 Free 1 requires at least 2 items.");
-        appliedDiscount = "Buy 1 Free 1";
-        break;
+      case "buy2free1":
+  if (totalQty < 3)
+    return alert("❌ Buy 2 Free 1 requires at least 3 items.");
+  appliedDiscount = "Buy 2 Free 1";
+  break;
       case "buy2get10":
         if (totalQty < 2) return alert("❌ Buy 2 Get 10% Off requires at least 2 items.");
         appliedDiscount = "Buy 2 Get 10% Off";
@@ -319,12 +324,16 @@ document.addEventListener("DOMContentLoaded", () => {
         case "5% Off": discountAmount = subtotal * 0.05; break;
         case "10% Off": discountAmount = subtotal * 0.10; break;
         case "Student Discount (10%)": discountAmount = subtotal * 0.10; break;
-        case "Buy 1 Free 1":
-          let sortedItems = [...cart].sort((a, b) => a.price - b.price);
-          let freeCount = Math.floor(totalQty / 2);
-          for (let i = 0; i < freeCount; i++)
-            discountAmount += sortedItems[i % sortedItems.length].price;
-          break;
+        case "Buy 2 Free 1":
+  if (totalQty >= 3) {
+    const sortedItems = [...cart].sort((a, b) => a.price - b.price);
+    const freeCount = Math.floor(totalQty / 3);
+
+    for (let i = 0; i < freeCount; i++) {
+      discountAmount += sortedItems[i % sortedItems.length].price;
+    }
+  }
+  break;
         case "Buy 2 Get 10% Off":
           if (totalQty >= 2) discountAmount = subtotal * 0.10;
           break;
