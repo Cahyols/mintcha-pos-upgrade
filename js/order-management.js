@@ -4,13 +4,20 @@ let sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
 let cart = [];
 let appliedDiscount = null;
 
+// === Reorder (drag & drop) state ===
+let dragSrcIndex = null;
+
 // === DOM Elements ===
 const menuContainer = document.getElementById("menuItems");
 const priceControls = document.getElementById("priceControls");
 const menuEmptyState = document.getElementById("menuEmptyState");
 const cartList = document.getElementById("cartList");
 const cartEmptyState = document.getElementById("cartEmptyState");
-const cartTotal = document.getElementById("cartTotal");
+const summarySubtotal = document.getElementById("summarySubtotal");
+const summaryDiscountRow = document.getElementById("summaryDiscountRow");
+const summaryDiscount = document.getElementById("summaryDiscount");
+const summaryTotal = document.getElementById("summaryTotal");
+const discountLabelEl = document.getElementById("discountLabel");
 const proceedPayment = document.getElementById("proceedPayment");
 const cancelOrder = document.getElementById("cancelOrder");
 const paymentModal = document.getElementById("paymentModal");
@@ -24,8 +31,31 @@ const closeDiscountModal = document.getElementById("closeDiscountModal");
 const discountOptions = document.querySelectorAll(".discount-option");
 const removeDiscountBtn = document.getElementById("removeDiscountBtn");
 
+// === Toast feedback, reusing the site's existing .toast/.show CSS component ===
+// Named showOrderToast (not showToast) to avoid colliding with anything
+// common.js may already define.
+let orderToastTimer = null;
+function showOrderToast(message) {
+  let toast = document.getElementById("orderToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "orderToast";
+    toast.className = "toast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(orderToastTimer);
+  orderToastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
+}
+
 // === Render Menu Items ===
-function renderMenu(editMode = false) {
+// mode: "view" (default, click-to-add) | "editPrices" | "reorder"
+// Legacy callers pass a boolean (true = editPrices, false/undefined = view) — normalized below.
+function renderMenu(mode = "view") {
+  if (mode === true) mode = "editPrices";
+  if (mode === false || mode == null) mode = "view";
+
   sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
   menuContainer.innerHTML = "";
 
@@ -38,56 +68,157 @@ function renderMenu(editMode = false) {
   sampleMenu.forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "menu-item";
+    div.dataset.index = index;
+    div.title = item.name; // full name on hover, as a backup to the 2-line clamp
 
-    if (editMode) {
+    if (mode === "editPrices") {
       div.innerHTML = `
-        <strong>${item.name}</strong><br>
-        RM <input 
-              type="number" 
-              step="0.01" 
-              value="${parseFloat(item.price).toFixed(2)}" 
-              class="price-input" 
-              data-index="${index}">
+        <strong>${item.name}</strong>
+        <span class="price-tag">RM <input
+              type="number"
+              step="0.01"
+              value="${parseFloat(item.price).toFixed(2)}"
+              class="price-input"
+              data-index="${index}"
+              aria-label="Price for ${item.name}"></span>
       `;
+    } else if (mode === "reorder") {
+      div.classList.add("draggable-item");
+      div.draggable = true;
+      div.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <strong>${item.name}</strong>
+        <span class="price-tag">RM${parseFloat(item.price).toFixed(2)}</span>
+      `;
+      attachDragHandlers(div, index);
     } else {
-      div.innerHTML = `<strong>${item.name}</strong><br>RM${parseFloat(item.price).toFixed(2)}`;
-      div.onclick = () => addToCart(index);
+      div.innerHTML = `
+        <strong>${item.name}</strong>
+        <span class="price-tag">RM${parseFloat(item.price).toFixed(2)}</span>
+      `;
+      div.tabIndex = 0;
+      div.setAttribute("role", "button");
+      div.setAttribute("aria-label", `Add ${item.name}, RM${parseFloat(item.price).toFixed(2)}, to cart`);
+      div.onclick = () => addToCart(index, div);
+      div.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          addToCart(index, div);
+        }
+      };
     }
 
     menuContainer.appendChild(div);
   });
 }
 
-// === Render Admin Edit Button ===
+// === Drag & Drop reorder handlers ===
+// Attaches HTML5 drag events to a single menu-item div so it can be
+// dragged onto another item to swap its position in sampleMenu.
+// Note: native HTML5 drag & drop does not fire on touch devices
+// (tablets/phones) — this works with mouse/trackpad input.
+function attachDragHandlers(div, index) {
+  div.addEventListener("dragstart", (e) => {
+    dragSrcIndex = index;
+    div.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  });
+
+  div.addEventListener("dragend", () => {
+    div.classList.remove("dragging");
+    document
+      .querySelectorAll(".menu-item.drag-over")
+      .forEach((el) => el.classList.remove("drag-over"));
+  });
+
+  div.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    div.classList.add("drag-over");
+  });
+
+  div.addEventListener("dragleave", () => {
+    div.classList.remove("drag-over");
+  });
+
+  div.addEventListener("drop", (e) => {
+    e.preventDefault();
+    div.classList.remove("drag-over");
+
+    const targetIndex = index;
+    if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
+
+    const moved = sampleMenu.splice(dragSrcIndex, 1)[0];
+    sampleMenu.splice(targetIndex, 0, moved);
+    localStorage.setItem("menuItems", JSON.stringify(sampleMenu));
+
+    dragSrcIndex = null;
+    renderMenu("reorder");
+  });
+}
+
+// === Render Admin Controls (Edit Prices + Reorder Menu) ===
+// The two modes are mutually exclusive: entering one disables the other's
+// button so an admin can't edit prices mid-drag or vice versa.
 function renderPriceEditorIfAdmin() {
   const role = localStorage.getItem("mintchaRole");
-  if (role === "admin") {
-    priceControls.innerHTML = `<button id="toggleEditPrices" class="edit-btn">🖊️ Edit Prices</button>`;
-    let editMode = false;
+  if (role !== "admin") return;
 
-    document.getElementById("toggleEditPrices").addEventListener("click", () => {
-      editMode = !editMode;
+  priceControls.innerHTML = `
+    <span class="admin-tools-label">Admin tools</span>
+    <button id="toggleEditPrices" class="edit-btn">🖊️ Edit Prices</button>
+    <button id="toggleReorder" class="edit-btn">🔀 Reorder Menu</button>
+  `;
 
-      if (editMode) {
-        renderMenu(true);
-        document.getElementById("toggleEditPrices").textContent = "💾 Save Prices";
-      } else {
-        const inputs = document.querySelectorAll(".price-input");
-        inputs.forEach(input => {
-          const idx = input.dataset.index;
-          const newPrice = parseFloat(input.value);
-          if (!isNaN(newPrice)) sampleMenu[idx].price = newPrice;
-        });
-        localStorage.setItem("menuItems", JSON.stringify(sampleMenu));
-        renderMenu(false);
-        document.getElementById("toggleEditPrices").textContent = "🖊️ Edit Prices";
-      }
-    });
-  }
+  let currentMode = "view";
+  const editBtn = document.getElementById("toggleEditPrices");
+  const reorderBtn = document.getElementById("toggleReorder");
+
+  editBtn.addEventListener("click", () => {
+    if (currentMode === "editPrices") {
+      const inputs = document.querySelectorAll(".price-input");
+      inputs.forEach((input) => {
+        const idx = input.dataset.index;
+        const newPrice = parseFloat(input.value);
+        if (!isNaN(newPrice)) sampleMenu[idx].price = newPrice;
+      });
+      localStorage.setItem("menuItems", JSON.stringify(sampleMenu));
+
+      currentMode = "view";
+      editBtn.textContent = "🖊️ Edit Prices";
+      editBtn.classList.remove("active-mode");
+      reorderBtn.disabled = false;
+      renderMenu("view");
+      showOrderToast("Prices saved");
+    } else {
+      currentMode = "editPrices";
+      editBtn.textContent = "💾 Save Prices";
+      editBtn.classList.add("active-mode");
+      reorderBtn.disabled = true;
+      renderMenu("editPrices");
+    }
+  });
+
+  reorderBtn.addEventListener("click", () => {
+    if (currentMode === "reorder") {
+      currentMode = "view";
+      reorderBtn.textContent = "🔀 Reorder Menu";
+      reorderBtn.classList.remove("active-mode");
+      editBtn.disabled = false;
+      renderMenu("view");
+    } else {
+      currentMode = "reorder";
+      reorderBtn.textContent = "✅ Done Reordering";
+      reorderBtn.classList.add("active-mode");
+      editBtn.disabled = true;
+      renderMenu("reorder");
+    }
+  });
 }
 
 // === Cart Functions ===
-function addToCart(index) {
+function addToCart(index, cardEl) {
   const selected = sampleMenu[index];
   const existing = cart.find(i => i.name === selected.name);
   if (existing) {
@@ -96,6 +227,13 @@ function addToCart(index) {
     cart.push({ name: selected.name, price: selected.price, qty: 1 });
   }
   updateCart();
+
+  if (cardEl) {
+    cardEl.classList.remove("just-added");
+    void cardEl.offsetWidth; // restart animation if clicked again quickly
+    cardEl.classList.add("just-added");
+  }
+  showOrderToast(`${selected.name} added to cart`);
 }
 
 function removeFromCart(index) {
@@ -117,6 +255,51 @@ function decreaseQty(index) {
   updateCart();
 }
 
+// === Discount Calculation (single source of truth) ===
+// Returns the discount amount (RM) for a given cart + discount label.
+// Used by both the live cart preview (updateCart) and the payment/receipt flow,
+// so the two can never drift out of sync.
+function calculateDiscount(cartItems, discountLabel) {
+  const subtotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const totalQty = cartItems.reduce((sum, i) => sum + i.qty, 0);
+
+  let discountAmount = 0;
+
+  switch (discountLabel) {
+    case "5% Off":
+      discountAmount = subtotal * 0.05;
+      break;
+    case "10% Off":
+      discountAmount = subtotal * 0.10;
+      break;
+    case "20% Off":
+      discountAmount = subtotal * 0.20;
+      break;
+    case "Buy 2 Free 1":
+      if (totalQty >= 3) {
+        // Give away the cheapest eligible units for free, one per 3 items bought,
+        // without discounting more units of a line than it actually has.
+        const freeCount = Math.floor(totalQty / 3);
+        const expanded = [];
+        cartItems.forEach(item => {
+          for (let i = 0; i < item.qty; i++) expanded.push(item.price);
+        });
+        expanded.sort((a, b) => a - b);
+        for (let i = 0; i < freeCount; i++) {
+          discountAmount += expanded[i];
+        }
+      }
+      break;
+    case "Buy 2 Get 10% Off":
+      if (totalQty >= 2) discountAmount = subtotal * 0.10;
+      break;
+  }
+
+  if (discountAmount > subtotal) discountAmount = subtotal;
+
+  return discountAmount;
+}
+
 // === Update Cart ===
 function updateCart() {
   cartList.innerHTML = "";
@@ -129,66 +312,40 @@ function updateCart() {
   }
 
   cart.forEach((item, idx) => {
-    subtotal += item.price * item.qty;
+    const lineTotal = item.price * item.qty;
+    subtotal += lineTotal;
     const div = document.createElement("div");
     div.className = "cart-item";
     div.innerHTML = `
-      <span>${item.name}</span>
-      <div class="item-controls">
-        <button onclick="decreaseQty(${idx})">-</button>
-        <span>${item.qty}</span>
-        <button onclick="increaseQty(${idx})">+</button>
-        <button onclick="removeFromCart(${idx})">🗑️</button>
+      <div class="cart-item-top">
+        <span class="item-name">${item.name}</span>
+        <span class="unit-price">RM${item.price.toFixed(2)} ea</span>
+      </div>
+      <div class="cart-item-bottom">
+        <div class="item-controls">
+          <button aria-label="Decrease quantity of ${item.name}" onclick="decreaseQty(${idx})">−</button>
+          <span>${item.qty}</span>
+          <button aria-label="Increase quantity of ${item.name}" onclick="increaseQty(${idx})">+</button>
+          <button class="remove-btn" aria-label="Remove ${item.name} from cart" onclick="removeFromCart(${idx})">🗑️</button>
+        </div>
+        <span class="line-total">RM${lineTotal.toFixed(2)}</span>
       </div>
     `;
     cartList.appendChild(div);
   });
 
-  let discountAmount = 0;
-  const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
-
-  switch (appliedDiscount) {
-    case "5% Off":
-      discountAmount = subtotal * 0.05;
-      break;
-    case "10% Off":
-      discountAmount = subtotal * 0.10;
-      break;
-    case "Student Discount (10%)":
-      discountAmount = subtotal * 0.10;
-      break;
-    case "Buy 2 Free 1":
-  if (totalQty >= 3) {
-    const sortedItems = [...cart].sort((a, b) => a.price - b.price);
-    const freeCount = Math.floor(totalQty / 3);
-
-    for (let i = 0; i < freeCount; i++) {
-      discountAmount += sortedItems[i % sortedItems.length].price;
-    }
-  }
-  break;
-    case "Buy 2 Get 10% Off":
-      if (totalQty >= 2) discountAmount = subtotal * 0.10;
-      break;
-    case "IG RM1 Off":
-      discountAmount = 1;
-      break;
-    case "TikTok RM1 Off":
-      discountAmount = 1;
-      break;
-    case "Med Sos RM2 Off":
-      discountAmount = 2;
-      break;
-  }
-
-  if (discountAmount > subtotal) discountAmount = subtotal;
-
+  const discountAmount = calculateDiscount(cart, appliedDiscount);
   const total = subtotal - discountAmount;
 
+  summarySubtotal.textContent = `RM${subtotal.toFixed(2)}`;
+  summaryTotal.textContent = `RM${total.toFixed(2)}`;
+
   if (appliedDiscount) {
-    cartTotal.textContent = `Subtotal: RM${subtotal.toFixed(2)} | Discount: ${appliedDiscount} (-RM${discountAmount.toFixed(2)}) | Total: RM${total.toFixed(2)}`;
+    discountLabelEl.textContent = appliedDiscount;
+    summaryDiscount.textContent = `-RM${discountAmount.toFixed(2)}`;
+    summaryDiscountRow.classList.remove("hidden");
   } else {
-    cartTotal.textContent = `Total: RM${total.toFixed(2)}`;
+    summaryDiscountRow.classList.add("hidden");
   }
 }
 
@@ -213,10 +370,10 @@ discountOptions.forEach(button => {
 
     switch (type) {
       case "buy2free1":
-  if (totalQty < 3)
-    return alert("❌ Buy 2 Free 1 requires at least 3 items.");
-  appliedDiscount = "Buy 2 Free 1";
-  break;
+        if (totalQty < 3)
+          return alert("❌ Buy 2 Free 1 requires at least 3 items.");
+        appliedDiscount = "Buy 2 Free 1";
+        break;
       case "buy2get10":
         if (totalQty < 2) return alert("❌ Buy 2 Get 10% Off requires at least 2 items.");
         appliedDiscount = "Buy 2 Get 10% Off";
@@ -227,22 +384,13 @@ discountOptions.forEach(button => {
       case "10off":
         appliedDiscount = "10% Off";
         break;
-      case "student10":
-        appliedDiscount = "Student Discount (10%)";
-        break;
-      case "ig1":
-        appliedDiscount = "IG RM1 Off";
-        break;
-      case "tiktok1":
-        appliedDiscount = "TikTok RM1 Off";
-        break;
-      case "medsos2":
-        appliedDiscount = "Med Sos RM2 Off";
+      case "20off":
+        appliedDiscount = "20% Off";
         break;
     }
 
     updateCart();
-    alert(`${appliedDiscount} applied!`);
+    showOrderToast(`${appliedDiscount} applied`);
     discountModal.style.display = "none";
   });
 });
@@ -251,15 +399,20 @@ removeDiscountBtn?.addEventListener("click", () => {
   if (!appliedDiscount) return alert("No discount applied.");
   appliedDiscount = null;
   updateCart();
-  alert("Discount removed.");
+  showOrderToast("Discount removed");
   discountModal.style.display = "flex";
 });
 
 // === Cancel Order ===
+// Guarded with a confirmation since this is a destructive, one-click action
+// sitting right next to "Proceed to Payment".
 cancelOrder?.addEventListener("click", () => {
+  if (!cart.length) return;
+  if (!confirm("Clear this order? This can't be undone.")) return;
   cart = [];
   resetDiscount();
   updateCart();
+  showOrderToast("Order cleared");
 });
 
 function resetDiscount() {
@@ -315,34 +468,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const stock = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
       const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
 
-      // Totals
+      // Totals — calculated via the shared calculateDiscount() function so the
+      // receipt/sale total always matches what was shown in the cart preview.
       let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-      let discountAmount = 0;
-      const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
-
-      switch (appliedDiscount) {
-        case "5% Off": discountAmount = subtotal * 0.05; break;
-        case "10% Off": discountAmount = subtotal * 0.10; break;
-        case "Student Discount (10%)": discountAmount = subtotal * 0.10; break;
-        case "Buy 2 Free 1":
-  if (totalQty >= 3) {
-    const sortedItems = [...cart].sort((a, b) => a.price - b.price);
-    const freeCount = Math.floor(totalQty / 3);
-
-    for (let i = 0; i < freeCount; i++) {
-      discountAmount += sortedItems[i % sortedItems.length].price;
-    }
-  }
-  break;
-        case "Buy 2 Get 10% Off":
-          if (totalQty >= 2) discountAmount = subtotal * 0.10;
-          break;
-        case "IG RM1 Off": discountAmount = 1; break;
-        case "TikTok RM1 Off": discountAmount = 1; break;
-        case "Med Sos RM2 Off": discountAmount = 2; break;
-      }
-
-      if (discountAmount > subtotal) discountAmount = subtotal;
+      const discountAmount = calculateDiscount(cart, appliedDiscount);
       const total = subtotal - discountAmount;
 
       // Receipt

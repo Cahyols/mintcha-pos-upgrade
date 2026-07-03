@@ -5,6 +5,128 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Order Management – Mintcha POS</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* =========================================================
+       Order Management page refinements.
+       These build on top of style.css's existing palette
+       (teal #00897b/#00796b/#004d40, red #f44336/#d32f2f,
+       admin yellow #fbc02d) rather than introducing new colors.
+       ========================================================= */
+
+    #priceControls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .admin-tools-label {
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: #777;
+      margin-right: 2px;
+    }
+    /* Existing .edit-btn is yellow site-wide for "admin editing" — keep that,
+       just make the active/pressed state unmistakable. */
+    .edit-btn.active-mode {
+      background-color: #f57f17;
+      box-shadow: inset 0 0 0 2px #333;
+    }
+    .edit-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* === Drag & drop reorder states === */
+    .menu-item.draggable-item { cursor: grab; }
+    .menu-item.draggable-item:active { cursor: grabbing; }
+    .menu-item.dragging { opacity: 0.4; }
+    .menu-item.drag-over { outline: 2px dashed #f9a825; outline-offset: 2px; }
+    .drag-handle { cursor: grab; margin-right: 4px; opacity: 0.6; user-select: none; }
+
+    /* === Menu grid: consistent card size, readable 2-line names === */
+    .menu-items { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .menu-item {
+      height: 104px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-start;
+      text-align: left;
+      box-sizing: border-box;
+      transition: background .2s ease, transform .15s ease, box-shadow .15s ease;
+    }
+    .menu-item:not(.draggable-item):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    }
+    .menu-item:focus-visible { outline: 2px solid #00796b; outline-offset: 2px; }
+    .menu-item strong {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      font-size: .92rem;
+      line-height: 1.25;
+    }
+    .menu-item .price-tag { font-weight: 700; color: #00796b; font-size: .9rem; }
+    .menu-item.just-added { animation: menuAdd .3s ease; }
+    @keyframes menuAdd {
+      0% { transform: scale(1); }
+      40% { transform: scale(.96); box-shadow: 0 0 0 3px #009688; }
+      100% { transform: scale(1); }
+    }
+
+    /* === Cart line items: same look as before, just clearer + bigger touch targets === */
+    .cart-item { flex-direction: column; align-items: stretch; gap: 6px; }
+    .cart-item-top { display: flex; justify-content: space-between; font-weight: 600; }
+    .cart-item-top .unit-price { font-weight: 400; color: #777; font-size: .8rem; white-space: nowrap; }
+    .cart-item-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .item-controls button {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .line-total { font-weight: 700; color: #00796b; white-space: nowrap; }
+
+    /* === Totals summary: broken into scannable rows instead of one line === */
+    .cart-summary { margin-top: .5rem; border-top: 1px dashed #ccc; padding-top: .6rem; font-size: .92rem; }
+    .cart-summary-row { display: flex; justify-content: space-between; padding: 2px 0; }
+    .cart-summary-row.discount { color: #d32f2f; font-weight: 600; } /* matches the sales-table discount column color */
+    .cart-summary-row.total {
+      font-weight: 800;
+      font-size: 1.15rem;
+      border-top: 1px solid #ccc;
+      margin-top: 6px;
+      padding-top: 8px;
+    }
+
+    .field-label { font-size: .78rem; font-weight: 600; color: #777; margin: 8px 0 3px; display: block; }
+
+    /* === Action buttons: clear priority instead of three identical buttons === */
+    .cart-actions { flex-direction: column; gap: 8px; }
+    #proceedPayment { order: 1; padding: .9rem; font-size: 1rem; font-weight: 700; }
+    #discountBtn {
+      order: 2;
+      background-color: #fff;
+      color: #00796b;
+      border: 1.5px solid #00897b;
+    }
+    #discountBtn:hover { background-color: #e0f2f1; }
+    #cancelOrder {
+      order: 3;
+      background: transparent;
+      color: #f44336; /* same red as the cart's remove-btn */
+      text-decoration: underline;
+      font-weight: 600;
+      padding: 4px;
+      align-self: center;
+    }
+    #cancelOrder:hover { background: transparent; color: #d32f2f; }
+
+    /* .empty-state was referenced in the HTML/JS but never actually defined
+       in style.css (only .empty-menu was) — filling that gap here. */
+    .empty-state { text-align: center; padding: 20px; color: #888; font-style: italic; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .menu-item, .toast { transition: none !important; animation: none !important; }
+    }
+  </style>
 </head>
 <body>
 
@@ -50,7 +172,7 @@
           <div id="priceControls"></div>
           <div class="menu-items" id="menuItems"></div>
           <div id="menuEmptyState" class="empty-state hidden">
-            No menu items available. Please add them in <a href="menu-recipes.html">Menu Recipes</a>.
+            No menu items yet. Add your first drink in <a href="menu-recipes.html">Menu Recipes</a>.
           </div>
         </div>
 
@@ -58,17 +180,26 @@
         <div class="cart-panel">
           <h2>Cart</h2>
           <div class="cart-list" id="cartList"></div>
-          <div id="cartEmptyState" class="empty-state">Your cart is empty</div>
-          <p class="cart-total">
-            <span id="cartTotal">RM0.00</span><br>
-            <small id="cartDiscountText" class="hidden">Discount Applied: <span id="discountLabel"></span></small>
-          </p>
-          <input type="text" id="customerName" placeholder="Customer name (optional)" />
+          <div id="cartEmptyState" class="empty-state">Your cart is empty — tap a menu item to add it.</div>
+
+          <div class="cart-summary" id="cartSummary">
+            <div class="cart-summary-row"><span>Subtotal</span><span id="summarySubtotal">RM0.00</span></div>
+            <div class="cart-summary-row discount hidden" id="summaryDiscountRow">
+              <span>Discount (<span id="discountLabel"></span>)</span><span id="summaryDiscount">-RM0.00</span>
+            </div>
+            <div class="cart-summary-row total"><span>Total</span><span id="summaryTotal">RM0.00</span></div>
+          </div>
+
+          <label for="customerName" class="field-label">Customer name (optional)</label>
+          <input type="text" id="customerName" placeholder="Walk-in" />
+
+          <label for="orderNote" class="field-label">Notes</label>
           <textarea id="orderNote" placeholder="Add notes..."></textarea>
+
           <div class="cart-actions">
-            <button id="discountBtn">Apply Discount</button>
             <button id="proceedPayment">Proceed to Payment</button>
-            <button id="cancelOrder">Cancel</button>
+            <button id="discountBtn">Apply Discount</button>
+            <button id="cancelOrder">Cancel order</button>
           </div>
         </div>
       </div>
@@ -101,15 +232,11 @@
       <h3>Select Discount</h3>
 
       <div class="discount-options">
-        <button class="discount-option" data-type="buy2get10">🛒 Buy 2 Get 10% Off</button>
-        <button class="discount-option" data-type="ig1">📸 IG RM1 Off</button>
-        <button class="discount-option" data-type="tiktok1">🎬 TikTok RM1 Off</button>
-        <button class="discount-option" data-type="medsos2">🌐 Med Sos RM2 Off</button>
-        <hr>
-        <button class="discount-option" data-type="buy2free1">🎁 Buy 2 Free 1</button>
         <button class="discount-option" data-type="5off">5% Off</button>
         <button class="discount-option" data-type="10off">10% Off</button>
-        <button class="discount-option" data-type="student10">🎓 Student Discount (10%)</button>
+        <button class="discount-option" data-type="20off">20% Off</button>
+        <button class="discount-option" data-type="buy2get10">Buy 2 Get 10% Off</button>
+        <button class="discount-option" data-type="buy2free1">Buy 2 Free 1</button>
       </div>
 
       <button id="removeDiscountBtn">Remove Discount</button>
@@ -119,7 +246,7 @@
   <!-- === Scripts === -->
   <script src="js/common.js"></script>
   <script src="js/order-management.js"></script>
-  
+
   <script>
     // === Live menu update when new drink is added in another tab/page ===
     window.addEventListener('storage', (event) => {
