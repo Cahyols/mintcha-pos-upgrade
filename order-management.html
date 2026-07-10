@@ -158,19 +158,31 @@
     }
     #discountBtn:hover { background-color: #e0f2f1; }
     #cancelOrder {
-      order: 3;
-      background: transparent;
-      color: #f44336; /* same red as the cart's remove-btn */
-      text-decoration: underline;
-      font-weight: 600;
-      padding: 4px;
-      align-self: center;
-    }
+  order: 3;
+  background-color: #f44336;
+  color: #fff;
+  border: none;
+  padding: .9rem;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+#cancelOrder:hover { background-color: #d32f2f; }
     #cancelOrder:hover { background: transparent; color: #d32f2f; }
 
     /* .empty-state was referenced in the HTML/JS but never actually defined
        in style.css (only .empty-menu was) — filling that gap here. */
     .empty-state { text-align: center; padding: 20px; color: #888; font-style: italic; }
+
+    .menu-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.menu-panel-header h2 { margin: 0; }
 
     @media (prefers-reduced-motion: reduce) {
       .menu-item, .toast { transition: none !important; animation: none !important; }
@@ -215,10 +227,12 @@
       </header>
 
       <div class="order-container">
-        <!-- Menu Section -->
+       <!-- Menu Section -->
         <div class="menu-panel">
-          <h2>Menu</h2>
-          <div id="priceControls"></div>
+          <div class="menu-panel-header">
+            <h2>Menu</h2>
+            <div id="priceControls"></div>
+          </div>
           <div class="menu-items" id="menuItems"></div>
           <div id="menuEmptyState" class="empty-state hidden">
             No menu items yet. Add your first drink in <a href="menu-recipes.html">Menu Recipes</a>.
@@ -286,6 +300,7 @@
         <button class="discount-option" data-type="20off">20% Off</button>
         <button class="discount-option" data-type="buy2get10">Buy 2 Get 10% Off</button>
         <button class="discount-option" data-type="buy2free1">Buy 2 Free 1</button>
+         <button class="discount-option discount-free" data-type="free">🎉 Free (Grand Opening)</button>
       </div>
 
       <button id="removeDiscountBtn">Remove Discount</button>

@@ -16,16 +16,18 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.appendChild(overlay);
 
   function openSidebar() {
-    sidebar.classList.add("open");
-    overlay.classList.add("show");
-    toggleBtn.textContent = "✕";
-  }
+  sidebar.classList.add("open");
+  overlay.classList.add("show");
+  toggleBtn.textContent = "✕";
+  document.body.classList.add("sidebar-open"); // 👈 add this
+}
 
-  function closeSidebar() {
-    sidebar.classList.remove("open");
-    overlay.classList.remove("show");
-    toggleBtn.textContent = "☰";
-  }
+function closeSidebar() {
+  sidebar.classList.remove("open");
+  overlay.classList.remove("show");
+  toggleBtn.textContent = "☰";
+  document.body.classList.remove("sidebar-open"); // 👈 add this
+}
 
   toggleBtn.addEventListener("click", () => {
     sidebar.classList.contains("open") ? closeSidebar() : openSidebar();

@@ -5,6 +5,117 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dashboard – Mintcha POS</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .page-content { padding: 0 1.5rem 1.5rem; }
+.dashboard-header {
+  padding: 1.5rem 1.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dashboard-header h1 {
+  margin: 0;
+}
+.dashboard-card h3 {
+  justify-content: space-between; /* was: no justify-content, so this pushes the date to the right */
+}
+.summary-date {
+  font-size: .8rem;
+  font-weight: 500;
+  color: #777;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #e8f5f3;
+  color: #00796b;
+  font-size: .85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+.user-badge .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00c853;
+}
+    .dashboard-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .dashboard-card h3 {
+      margin: 0 0 1rem;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .warning-card #lowStockList { list-style: none; padding: 0; margin: 0; }
+    .warning-card #lowStockList li {
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: #fafafa;
+    }
+    .warning-card #lowStockList li:last-child { margin-bottom: 0; }
+
+    /* === Today's Summary === */
+    .summary-hero {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: linear-gradient(135deg, #00796b, #00897b);
+      color: #fff;
+      border-radius: 10px;
+      padding: 1.1rem 1.4rem;
+      margin-bottom: 1rem;
+    }
+    .summary-hero .label { font-size: .8rem; opacity: .85; text-transform: uppercase; letter-spacing: .04em; }
+    .summary-hero .value { font-size: 2rem; font-weight: 800; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .summary-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      border-radius: 10px;
+      padding: 14px 10px;
+      border: 1px solid #eee;
+    }
+    .summary-box .icon { font-size: 1.4rem; margin-bottom: 4px; }
+    .summary-box .value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+    .summary-box .label { font-size: .72rem; color: #777; text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
+
+    .summary-box.total   { background: #e8f5f3; }
+    .summary-box.total   .value { color: #00796b; }
+    .summary-box.paid    { background: #e3f2fd; }
+    .summary-box.paid    .value { color: #1565c0; }
+    .summary-box.discount{ background: #fff3e0; }
+    .summary-box.discount .value { color: #e65100; }
+    .summary-box.free    { background: #fce4ec; }
+    .summary-box.free    .value { color: #c2185b; }
+
+    @media (max-width: 500px) {
+      .summary-hero .value { font-size: 1.6rem; }
+    }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -37,22 +148,30 @@
     <section class="dashboard page">
       <header class="dashboard-header">
         <h1>Welcome to Mintcha POS</h1>
-        <p>You're logged in as: <span id="loggedUser"></span></p>
+        <span class="user-badge"><span class="dot"></span>Logged in as <strong id="loggedUser"></strong></span>
       </header>
 
-      <!-- === Dashboard Content (Optional) === -->
-      <div style="padding: 1rem;">
-        <p>[Dashboard content goes here]</p>
-      </div>
+      <div class="page-content">
+        <!-- === Today's Summary (Admin only) === -->
+      <section id="todaySummaryCard" class="dashboard-card" style="display:none;">
+          <h3>
+            📊 Today's Summary
+            <span id="todaySummaryDate" class="summary-date"></span>
+          </h3>
+          <div id="todaySummaryContent"></div>
+        </section>
 
-      <!-- === Low Stock Alerts Section === -->
-      <section class="dashboard-card warning-card">
-        <h3>⚠️ Low Stock Alerts</h3>
-        <ul id="lowStockList">
-          <!-- Populated by JS -->
-        </ul>
-      </section>
-    </section>
+        <!-- === Low Stock Alerts Section === -->
+        <section class="dashboard-card warning-card">
+          <h3>⚠️ Low Stock Alerts</h3>
+          <ul id="lowStockList">
+            <!-- Populated by JS -->
+          </ul>
+        </section>
+      </div>
+    </section>>
+
+    
   </div>
 
   <!-- === Scripts === -->

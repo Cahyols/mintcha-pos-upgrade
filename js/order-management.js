@@ -277,7 +277,6 @@ function renderPriceEditorIfAdmin() {
   if (role !== "admin") return;
 
   priceControls.innerHTML = `
-    <span class="admin-tools-label">Admin tools</span>
     <button id="toggleEditPrices" class="edit-btn">🖊️ Edit Prices</button>
     <button id="toggleReorder" class="edit-btn">🔀 Reorder Menu</button>
   `;
@@ -401,6 +400,9 @@ function calculateDiscount(cartItems, discountLabel) {
         }
       }
       break;
+      case "Free":
+      discountAmount = subtotal; // 100% off — whole order becomes RM0.00
+      break;
     case "Buy 2 Get 10% Off":
       if (totalQty >= 2) discountAmount = subtotal * 0.10;
       break;
@@ -514,6 +516,9 @@ discountOptions.forEach(button => {
         break;
       case "20off":
         appliedDiscount = "20% Off";
+        break;
+        case "free":
+        appliedDiscount = "Free";
         break;
     }
 

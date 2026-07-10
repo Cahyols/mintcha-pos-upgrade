@@ -147,6 +147,23 @@ button:hover {
   background: rgba(0, 0, 0, .4);
   z-index: 999;
 }
+@media (max-width: 1800px) {
+  .sidebar {
+    /* existing rules stay the same */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* smooth momentum scroll on iOS */
+  }
+
+  /* Prevents flex children from blocking scroll on their parent */
+  .sidebar .nav-section {
+    flex-shrink: 0;
+  }
+}
+body.sidebar-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
 
 @media (max-width: 1800px) {
   .hamburger-btn {
