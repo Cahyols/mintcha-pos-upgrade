@@ -222,6 +222,15 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       row.appendChild(statusCell);
+        // === Receipt column ===
+      const receiptCell = document.createElement("td");
+      const printBtn = document.createElement("button");
+      printBtn.textContent = "🖨️ Print";
+      printBtn.className = "admin-btn print-receipt-btn";
+      printBtn.onclick = () => viewReceipt(sale.id);
+      receiptCell.appendChild(printBtn);
+      row.appendChild(receiptCell);
+
       tableBody.appendChild(row);
     });
   }
@@ -345,4 +354,51 @@ function exportSalesToJSON() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+function viewReceipt(saleId) {
+  const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return alert("Sale not found.");
+
+  const receiptModal = document.getElementById("receiptModal");
+  const receiptContent = document.getElementById("receiptContent");
+
+  const itemList = (sale.items || [])
+    .map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`)
+    .join("");
+
+  const refundBlock = sale.status === "Refunded"
+    ? `<div class="refund-note"><strong>⚠ REFUNDED</strong><br>Reason: ${sale.refundReason || "-"}</div>`
+    : "";
+
+  receiptContent.innerHTML = `
+    <span id="closeReceiptModal" class="close">&times;</span>
+    <div class="receipt-brand">🍃 Mintcha</div>
+    <div class="receipt-header">
+      <div><strong>${sale.date}</strong></div>
+      <div>Order ID: ${sale.id}</div>
+      <div>Cashier: ${sale.cashier || "-"}</div>
+      <div>Customer: ${sale.customer || "-"}</div>
+    </div>
+    <div class="receipt-body">
+      ${itemList}
+      <div><em>Note:</em> ${sale.note || "-"}</div>
+      <div><strong>Discount:</strong> ${sale.discountType || "None"}</div>
+      <div><strong>Payment:</strong> ${sale.paymentMethod || "-"}</div>
+    </div>
+    <div class="receipt-footer">
+      <strong>Subtotal:</strong> RM${parseFloat(sale.subtotal || 0).toFixed(2)}<br>
+      <strong>Discount:</strong> -RM${parseFloat(sale.discountAmount || 0).toFixed(2)}<br>
+      <strong>Total:</strong> RM${parseFloat(sale.total || 0).toFixed(2)}<br>
+      ${refundBlock}
+      <div>#TeamRumput VS #TeamMint 💚</div>
+      <button id="closeReceiptModalBtn">OK</button>
+    </div>
+  `;
+
+  receiptModal.style.display = "flex";
+
+  const closeModal = () => (receiptModal.style.display = "none");
+  document.getElementById("closeReceiptModalBtn").onclick = closeModal;
+  document.getElementById("closeReceiptModal").onclick = closeModal;
 }

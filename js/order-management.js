@@ -7,6 +7,16 @@ let appliedDiscount = null;
 // === Reorder (drag & drop) state ===
 let dragSrcIndex = null;
 
+// === Menu card color tagging ===
+// 5 preset colors only, kept simple — no custom color picker needed.
+const CARD_COLORS = [
+  { name: "Rose",    value: "#ffcdd2" },
+  { name: "Amber",   value: "#ffe0b2" },
+  { name: "Mint",    value: "#c8e6c9" },
+  { name: "Sky",     value: "#b3e5fc" },
+  { name: "Lavender",value: "#d1c4e9" },
+];
+
 // === DOM Elements ===
 const menuContainer = document.getElementById("menuItems");
 const priceControls = document.getElementById("priceControls");
@@ -69,7 +79,12 @@ function renderMenu(mode = "view") {
     const div = document.createElement("div");
     div.className = "menu-item";
     div.dataset.index = index;
-    div.title = item.name; // full name on hover, as a backup to the 2-line clamp
+    div.title = item.name;
+
+    // Apply saved color tag, if any
+    if (item.color) {
+      div.style.backgroundColor = item.color;
+    }
 
     if (mode === "editPrices") {
       div.innerHTML = `
@@ -108,8 +123,101 @@ function renderMenu(mode = "view") {
       };
     }
 
+    // Color tag button available in every mode — small dot in the corner
+    attachColorPicker(div, index);
+
     menuContainer.appendChild(div);
   });
+}
+
+// === Color tag picker ===
+// Adds a small colored dot button to a menu card. Clicking it opens a
+// popover of 5 preset swatches (+ "Clear") so any user can manually tag
+// a card's color — purely visual, doesn't touch price/order data.
+function attachColorPicker(div, index) {
+  const dot = document.createElement("button");
+  dot.type = "button";
+  dot.className = "color-dot-btn";
+  dot.title = "Set card color";
+  dot.setAttribute("aria-label", "Set card color");
+
+  const item = sampleMenu[index];
+  dot.style.backgroundColor = item.color || "#fff";
+  if (!item.color) dot.classList.add("color-dot-empty");
+
+  dot.addEventListener("click", (e) => {
+    e.stopPropagation(); // don't trigger addToCart on the card behind it
+    e.preventDefault();
+
+    // Close any other open popover first
+    document.querySelectorAll(".color-swatch-popover").forEach(p => p.remove());
+
+    const popover = document.createElement("div");
+    popover.className = "color-swatch-popover";
+
+    CARD_COLORS.forEach(color => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "color-swatch";
+      swatch.style.backgroundColor = color.value;
+      swatch.title = color.name;
+      swatch.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        setCardColor(index, color.value);
+        popover.remove();
+      });
+      popover.appendChild(swatch);
+    });
+
+    // "Clear" option to remove the tag
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "color-swatch color-swatch-clear";
+    clearBtn.title = "Clear color";
+    clearBtn.textContent = "✕";
+    clearBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      setCardColor(index, null);
+      popover.remove();
+    });
+    popover.appendChild(clearBtn);
+
+    div.appendChild(popover);
+
+    // Close popover if clicking anywhere else on the page
+    const closeOnOutsideClick = (ev) => {
+      if (!popover.contains(ev.target) && ev.target !== dot) {
+        popover.remove();
+        document.removeEventListener("click", closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", closeOnOutsideClick), 0);
+  });
+
+  div.appendChild(dot);
+}
+
+function setCardColor(index, colorValue) {
+  sampleMenu = JSON.parse(localStorage.getItem("menuItems")) || [];
+  if (colorValue) {
+    sampleMenu[index].color = colorValue;
+  } else {
+    delete sampleMenu[index].color;
+  }
+  localStorage.setItem("menuItems", JSON.stringify(sampleMenu));
+
+  // Re-render in whatever mode is currently active, so admin edit/reorder
+  // modes keep working after a color change
+  const editBtn = document.getElementById("toggleEditPrices");
+  const reorderBtn = document.getElementById("toggleReorder");
+  if (editBtn?.classList.contains("active-mode")) {
+    renderMenu("editPrices");
+  } else if (reorderBtn?.classList.contains("active-mode")) {
+    renderMenu("reorder");
+  } else {
+    renderMenu("view");
+  }
+  showOrderToast(colorValue ? "Card color updated" : "Card color cleared");
 }
 
 // === Drag & Drop reorder handlers ===
@@ -302,6 +410,14 @@ function calculateDiscount(cartItems, discountLabel) {
 
 // === Update Cart ===
 function updateCart() {
+  // An empty cart can never legitimately carry a discount. This is a safety
+  // net so a stray failure elsewhere (e.g. an error thrown before
+  // resetDiscount() runs during checkout) can never leave a "phantom"
+  // discount showing on an empty cart.
+  if (!cart.length && appliedDiscount) {
+    appliedDiscount = null;
+  }
+
   cartList.innerHTML = "";
   let subtotal = 0;
 
@@ -344,8 +460,17 @@ function updateCart() {
     discountLabelEl.textContent = appliedDiscount;
     summaryDiscount.textContent = `-RM${discountAmount.toFixed(2)}`;
     summaryDiscountRow.classList.remove("hidden");
+    // Inline style wins any specificity tie against ".hidden" vs
+    // ".cart-summary-row" in the page's own <style> block, so this can
+    // never be visually overridden by the cascade.
+    summaryDiscountRow.style.display = "flex";
   } else {
     summaryDiscountRow.classList.add("hidden");
+    summaryDiscountRow.style.display = "none";
+    // Also clear the stale text so nothing lingers if this row is ever
+    // shown again by a future bug.
+    summaryDiscount.textContent = "-RM0.00";
+    discountLabelEl.textContent = "";
   }
 }
 
@@ -457,80 +582,90 @@ document.addEventListener("DOMContentLoaded", () => {
   paymentButtons.forEach(button => {
     button.addEventListener("click", () => {
       const method = button.dataset.method;
-      const customer = document.getElementById("customerName").value || "Walk-in";
-      const note = document.getElementById("orderNote").value;
-      const orderId = generateOrderId();
-      const now = new Date();
-      const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
-      const dateStr = now.toLocaleString("en-MY", options);
 
-      const cashier = localStorage.getItem("mintchaUser") || "Unknown";
-      const stock = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
-      const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
+      // Wrapped in try/finally: if anything below throws (bad localStorage
+      // data, quota errors, etc.), the cart and discount still get cleared
+      // in the `finally` block so a failed save can never leave a stale
+      // discount/cart stuck on screen for the next order.
+      try {
+        const customer = document.getElementById("customerName").value || "Walk-in";
+        const note = document.getElementById("orderNote").value;
+        const orderId = generateOrderId();
+        const now = new Date();
+        const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+        const dateStr = now.toLocaleString("en-MY", options);
 
-      // Totals — calculated via the shared calculateDiscount() function so the
-      // receipt/sale total always matches what was shown in the cart preview.
-      let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-      const discountAmount = calculateDiscount(cart, appliedDiscount);
-      const total = subtotal - discountAmount;
+        const cashier = localStorage.getItem("mintchaUser") || "Unknown";
 
-      // Receipt
-      const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
-      receiptContent.innerHTML = `
-        <div class="receipt-brand">🍃 Mintcha</div>
-        <div class="receipt-header">
-          <div><strong>${dateStr}</strong></div>
-          <div>Order ID: ${orderId}</div>
-          <div>Cashier: ${cashier}</div>
-        </div>
-        <div class="receipt-body">
-          ${itemList}
-          <div><em>Note:</em> ${note || '-'}</div>
-          <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
-          <div><strong>Payment:</strong> ${method}</div>
-        </div>
-        <div class="receipt-footer">
-          <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
-          <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
-          <strong>Total:</strong> RM${total.toFixed(2)}<br>
-          <div class="receipt-barcode"></div>
-          <div>#TeamRumput VS #TeamMint 💚</div>
-          <button id="closeReceiptModal">OK</button>
-        </div>
-      `;
+        // Totals — calculated via the shared calculateDiscount() function so the
+        // receipt/sale total always matches what was shown in the cart preview.
+        let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+        const discountAmount = calculateDiscount(cart, appliedDiscount);
+        const total = subtotal - discountAmount;
 
-      // Save sale
-      const sale = {
-        id: orderId,
-        date: dateStr,
-        cashier,
-        customer,
-        note,
-        items: [...cart],
-        paymentMethod: method,
-        subtotal,
-        discountType: appliedDiscount || "None",
-        discountAmount,
-        total,
-        status: "Pending"
-      };
+        // Receipt
+        const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
+        receiptContent.innerHTML = `
+          <div class="receipt-brand">🍃 Mintcha</div>
+          <div class="receipt-header">
+            <div><strong>${dateStr}</strong></div>
+            <div>Order ID: ${orderId}</div>
+            <div>Cashier: ${cashier}</div>
+          </div>
+          <div class="receipt-body">
+            ${itemList}
+            <div><em>Note:</em> ${note || '-'}</div>
+            <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
+            <div><strong>Payment:</strong> ${method}</div>
+          </div>
+          <div class="receipt-footer">
+            <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
+            <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
+            <strong>Total:</strong> RM${total.toFixed(2)}<br>
+            <div class="receipt-barcode"></div>
+            <div>#TeamRumput VS #TeamMint 💚</div>
+            <button id="closeReceiptModal">OK</button>
+          </div>
+        `;
 
-      const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
-      allSales.unshift(sale);
-      localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
+        // Save sale
+        const sale = {
+          id: orderId,
+          date: dateStr,
+          cashier,
+          customer,
+          note,
+          items: [...cart],
+          paymentMethod: method,
+          subtotal,
+          discountType: appliedDiscount || "None",
+          discountAmount,
+          total,
+          status: "Pending"
+        };
 
-      cart = [];
-      resetDiscount();
-      updateCart();
-      document.getElementById("customerName").value = "";
-      document.getElementById("orderNote").value = "";
-      paymentModal.style.display = "none";
+        const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+        allSales.unshift(sale);
+        localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
 
-      document.getElementById("closeReceiptModal").onclick = () => {
-        receiptModal.style.display = "none";
-      };
+        document.getElementById("closeReceiptModal").onclick = () => {
+          receiptModal.style.display = "none";
+        };
 
-      receiptModal.style.display = "flex";
+        receiptModal.style.display = "flex";
+      } catch (err) {
+        console.error("Payment/save failed:", err);
+        showOrderToast("Something went wrong saving the order");
+      } finally {
+        // Always runs, whether the sale saved successfully or not — this is
+        // what guarantees the discount can never survive past checkout.
+        cart = [];
+        resetDiscount();
+        updateCart();
+        document.getElementById("customerName").value = "";
+        document.getElementById("orderNote").value = "";
+        paymentModal.style.display = "none";
+      }
     });
   });
 });

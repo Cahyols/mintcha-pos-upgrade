@@ -22,6 +22,55 @@
       color: #777;
       margin-right: 2px;
     }
+    /* === Color tag dot + popover === */
+.menu-item { position: relative; } /* needed so the popover positions correctly */
+
+.color-dot-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,.25);
+  padding: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.color-dot-empty {
+  background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 0 / 6px 6px;
+}
+
+.color-swatch-popover {
+  position: absolute;
+  top: 26px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  z-index: 10;
+}
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,.15);
+  padding: 0;
+  cursor: pointer;
+}
+.color-swatch:hover { transform: scale(1.15); }
+.color-swatch-clear {
+  background: #fff;
+  color: #999;
+  font-size: .7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
     /* Existing .edit-btn is yellow site-wide for "admin editing" — keep that,
        just make the active/pressed state unmistakable. */
     .edit-btn.active-mode {

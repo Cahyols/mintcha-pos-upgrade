@@ -100,6 +100,7 @@
               <th>Payment</th>
               <th>Discount</th>
               <th>Status</th>
+              <th>Receipt</th>
             </tr>
           </thead>
           <tbody id="salesTableBody"></tbody>
@@ -110,9 +111,17 @@
       <div id="paginationControls" class="pagination"></div>
     </section>
   </div>
+  <!-- === Receipt Modal (view-only, reused pattern from Order Management) === -->
+  <div id="receiptModal" class="modal hidden">
+    
+      <span id="closeReceiptModal" class="close">&times;</span>
+      <div id="receiptContent"></div>
+    
+  </div>
 
   <!-- === Scripts === -->
   <script src="js/common.js"></script>
   <script src="js/sales-overview.js"></script>
+  
 </body>
 </html>
