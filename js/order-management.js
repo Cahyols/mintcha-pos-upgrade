@@ -15,6 +15,9 @@ const CARD_COLORS = [
   { name: "Mint",    value: "#c8e6c9" },
   { name: "Sky",     value: "#b3e5fc" },
   { name: "Lavender",value: "#d1c4e9" },
+  { name: "Soft Chocolate", value: "#bcaaa4" },
+  { name: "Buttercream", value: "#EED7A1" },
+  { name: "Red", value: "#ff7477" },
 ];
 
 // === DOM Elements ===
