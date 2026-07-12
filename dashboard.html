@@ -21,12 +21,80 @@
 .dashboard-card h3 {
   justify-content: space-between; /* was: no justify-content, so this pushes the date to the right */
 }
+.summary-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1rem;
+  font-size: .85rem;
+  color: #555;
+  flex-wrap: wrap;
+}
+.summary-date-filter input[type="date"] {
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: .85rem;
+}
+.summary-date-filter button {
+  padding: 5px 12px;
+  font-size: .8rem;
+  border-radius: 6px;
+  border: 1px solid #00897b;
+  background: #fff;
+  color: #00796b;
+  cursor: pointer;
+}
+.summary-date-filter button:hover { background: #e0f2f1; }
 .summary-date {
   font-size: .8rem;
   font-weight: 500;
   color: #777;
   text-transform: none;
   letter-spacing: normal;
+}
+.drink-breakdown {
+  margin-top: 1.25rem;
+  border-top: 1px solid #eee;
+  padding-top: 1rem;
+}
+.drink-breakdown h4 {
+  margin: 0 0 .6rem;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: #777;
+}
+.drink-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.drink-row .drink-name {
+  flex: 1;
+  font-size: .9rem;
+  font-weight: 600;
+  color: #333;
+}
+.drink-row .drink-bar-track {
+  flex: 2;
+  background: #f0f0f0;
+  border-radius: 6px;
+  height: 8px;
+  overflow: hidden;
+}
+.drink-row .drink-bar-fill {
+  height: 100%;
+  background: #00897b;
+  border-radius: 6px;
+}
+.drink-row .drink-qty {
+  width: 34px;
+  text-align: right;
+  font-weight: 800;
+  color: #00796b;
+  font-size: .9rem;
 }
 .user-badge {
   display: inline-flex;
@@ -153,12 +221,20 @@
 
       <div class="page-content">
         <!-- === Today's Summary (Admin only) === -->
+         
       <section id="todaySummaryCard" class="dashboard-card" style="display:none;">
           <h3>
             📊 Today's Summary
             <span id="todaySummaryDate" class="summary-date"></span>
           </h3>
+           <div class="summary-date-filter">
+            <label for="summaryDatePicker">View date:</label>
+            <input type="date" id="summaryDatePicker" />
+            <button id="summaryTodayBtn" class="admin-btn">Today</button>
+          </div>
           <div id="todaySummaryContent"></div>
+          <div id="todaySummaryContent"></div>
+          <div id="drinkBreakdown"></div>
         </section>
 
         <!-- === Low Stock Alerts Section === -->
@@ -169,12 +245,12 @@
           </ul>
         </section>
       </div>
-    </section>>
+    </section>> 
 
     
   </div>
 
-  <!-- === Scripts === -->
+  <!-- === Scripts === -->    
   <script src="js/common.js"></script>
   <script src="js/dashboard.js"></script>
 

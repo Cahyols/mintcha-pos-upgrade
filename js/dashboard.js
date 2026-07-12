@@ -74,18 +74,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // === Today's Sales & Cup Summary (Admin only) ===
-  function renderTodaySummary() {
+  // === Sales & Cup Summary for a given date (Admin only) ===
+  function renderSummaryForDate(targetDate) {
     const role = localStorage.getItem("mintchaRole");
     const summaryCard = document.getElementById("todaySummaryCard");
     const summaryContent = document.getElementById("todaySummaryContent");
     if (!summaryCard || !summaryContent) return;
     if (role !== "admin") return; // stays hidden for non-admins
 
-   summaryCard.style.display = "block";
+    summaryCard.style.display = "block";
 
+    const targetStr = targetDate.toDateString();
+    const isToday = targetStr === new Date().toDateString();
+
+    // Update heading title + date label
+    const titleEl = document.getElementById("summaryTitle");
     const dateLabel = document.getElementById("todaySummaryDate");
+    if (titleEl) titleEl.textContent = isToday ? "Today's Summary" : "Summary";
     if (dateLabel) {
-      dateLabel.textContent = new Date().toLocaleDateString("en-MY", {
+      dateLabel.textContent = targetDate.toLocaleDateString("en-MY", {
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -94,25 +101,56 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
-    const todayStr = new Date().toDateString(); // e.g. "Fri Jul 11 2026"
 
-    // Only count sales actually made today, and exclude refunded orders
+    // Only count sales made on the target date, excluding refunded orders
     // from revenue/cup totals so the numbers reflect real business activity.
-    const todaySales = allSales.filter(sale => {
+    const daySales = allSales.filter(sale => {
       if (sale.status === "Refunded") return false;
       const saleDate = parseDateSafe(sale.date);
       if (!saleDate) return false;
-      return saleDate.toDateString() === todayStr;
+      return saleDate.toDateString() === targetStr;
     });
 
     let totalRevenue = 0;
     let paidCups = 0;
-    let freeCups = 0; // covers "Free" discount specifically
-    let discountedCups = 0; // any other discount type (5%, 10%, Buy 2 Free 1, etc.)
+    let freeCups = 0;
+    let discountedCups = 0;
 
-    todaySales.forEach(sale => {
+    daySales.forEach(sale => {
       totalRevenue += parseFloat(sale.total || 0);
       const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
+      // === Per-drink breakdown for the selected day ===
+    const drinkCounts = {};
+    daySales.forEach(sale => {
+      (sale.items || []).forEach(item => {
+        drinkCounts[item.name] = (drinkCounts[item.name] || 0) + (item.qty || 0);
+      });
+    });
+
+    const sortedDrinks = Object.entries(drinkCounts).sort((a, b) => b[1] - a[1]);
+    const maxQty = sortedDrinks.length ? sortedDrinks[0][1] : 0;
+
+    const breakdownEl = document.getElementById("drinkBreakdown");
+    if (breakdownEl) {
+      if (!sortedDrinks.length) {
+        breakdownEl.innerHTML = "";
+      } else {
+        breakdownEl.innerHTML = `
+          <div class="drink-breakdown">
+            <h4>🥤 Drinks Sold${isToday ? " Today" : ""}</h4>
+            ${sortedDrinks.map(([name, qty]) => `
+              <div class="drink-row">
+                <span class="drink-name">${name}</span>
+                <div class="drink-bar-track">
+                  <div class="drink-bar-fill" style="width:${maxQty ? (qty / maxQty) * 100 : 0}%"></div>
+                </div>
+                <span class="drink-qty">${qty}</span>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+    }
 
       if (sale.discountType === "Free") {
         freeCups += cupsInSale;
@@ -125,9 +163,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const totalCups = paidCups + freeCups + discountedCups;
 
+    // Friendly empty state if no sales happened on the chosen day at all
+   if (!daySales.length) {
+      summaryContent.innerHTML = `
+        <div class="summary-hero">
+          <span class="label">Total Sales</span>
+          <span class="value">RM0.00</span>
+        </div>
+        <p style="text-align:center; color:#999; margin: 10px 0 0;">No sales recorded on this date.</p>
+      `;
+      const breakdownEl = document.getElementById("drinkBreakdown");
+      if (breakdownEl) breakdownEl.innerHTML = "";
+      return;
+    }
+
     summaryContent.innerHTML = `
       <div class="summary-hero">
-        <span class="label">Total Sales Today</span>
+        <span class="label">Total Sales${isToday ? " Today" : ""}</span>
         <span class="value">RM${totalRevenue.toFixed(2)}</span>
       </div>
       <div class="summary-grid">
@@ -155,6 +207,33 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
-  renderTodaySummary();
+  // === Wire up the date picker ===
+  function setupSummaryDatePicker() {
+    const datePicker = document.getElementById("summaryDatePicker");
+    const todayBtn = document.getElementById("summaryTodayBtn");
+    if (!datePicker) return;
+
+    // Default the input to today's date, in the yyyy-mm-dd format <input type="date"> requires
+    const today = new Date();
+    const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    datePicker.value = isoToday;
+    datePicker.max = isoToday; // can't pick a future date
+
+    datePicker.addEventListener("change", () => {
+      if (!datePicker.value) return;
+      // datePicker.value is "YYYY-MM-DD" — construct as local time, not UTC,
+      // so it matches the local-time dates parseDateSafe produces elsewhere.
+      const [y, m, d] = datePicker.value.split("-").map(Number);
+      renderSummaryForDate(new Date(y, m - 1, d));
+    });
+
+    todayBtn?.addEventListener("click", () => {
+      datePicker.value = isoToday;
+      renderSummaryForDate(new Date());
+    });
+  }
+
+  setupSummaryDatePicker();
+  renderSummaryForDate(new Date());
   renderLowStockAlerts();
 });
