@@ -112,6 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     let totalRevenue = 0;
+    let totalSubtotal = 0; 
     let paidCups = 0;
     let freeCups = 0;
     let discountedCups = 0;
@@ -121,6 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     daySales.forEach(sale => {
       totalRevenue += parseFloat(sale.total || 0);
+        totalSubtotal += parseFloat(sale.subtotal || 0);
        totalDiscountAmount += parseFloat(sale.discountAmount || 0); // 👈 new
       const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
 
@@ -187,8 +189,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     summaryContent.innerHTML = `
       <div class="summary-hero">
-        <span class="label">Total Sales${isToday ? " Today" : ""}</span>
-        <span class="value">RM${totalRevenue.toFixed(2)}</span>
+        <div class="hero-main">
+          <span class="label">Total Sales${isToday ? " Today" : ""}</span>
+          <span class="value">RM${totalRevenue.toFixed(2)}</span>
+        </div>
+        <div class="hero-breakdown">
+          <div class="hero-row">
+            <span>Subtotal (before discounts)</span>
+            <span>RM${totalSubtotal.toFixed(2)}</span>
+          </div>
+          <div class="hero-row">
+            <span>Total Discount Given</span>
+            <span>-RM${totalDiscountAmount.toFixed(2)}</span>
+          </div>
+          <div class="hero-row">
+            <span>Free Drinks Value</span>
+            <span>-RM${totalFreeValue.toFixed(2)}</span>
+          </div>
+          <div class="hero-row hero-row-total">
+            <span>Grand Total</span>
+            <span>RM${totalRevenue.toFixed(2)}</span>
+          </div>
+        </div>
       </div>
       <div class="summary-grid">
         <div class="summary-box total">
