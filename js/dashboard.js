@@ -115,10 +115,15 @@ document.addEventListener("DOMContentLoaded", () => {
     let paidCups = 0;
     let freeCups = 0;
     let discountedCups = 0;
+     let totalDiscountAmount = 0; // 👈 new
+      let totalFreeValue = 0; // 👈 new — value of free drinks at full price
+
 
     daySales.forEach(sale => {
       totalRevenue += parseFloat(sale.total || 0);
+       totalDiscountAmount += parseFloat(sale.discountAmount || 0); // 👈 new
       const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
+
       // === Per-drink breakdown for the selected day ===
     const drinkCounts = {};
     daySales.forEach(sale => {
@@ -154,6 +159,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (sale.discountType === "Free") {
         freeCups += cupsInSale;
+        // Value of the free items is just the subtotal of that sale,
+        // since a "Free" discount zeroes out the whole order's price.
+        totalFreeValue += parseFloat(sale.subtotal || 0); // 👈 new
       } else if (sale.discountType && sale.discountType !== "None") {
         discountedCups += cupsInSale;
       } else {
@@ -193,15 +201,17 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="value">${paidCups}</span>
           <span class="label">Full-Price</span>
         </div>
-        <div class="summary-box discount">
+       <div class="summary-box discount">
           <span class="icon">🏷️</span>
           <span class="value">${discountedCups}</span>
           <span class="label">Discounted</span>
+          <span class="sub-label">-RM${totalDiscountAmount.toFixed(2)}</span>
         </div>
         <div class="summary-box free">
           <span class="icon">🎉</span>
           <span class="value">${freeCups}</span>
           <span class="label">Free</span>
+          <span class="sub-label">RM${totalFreeValue.toFixed(2)}</span>
         </div>
       </div>
     `;

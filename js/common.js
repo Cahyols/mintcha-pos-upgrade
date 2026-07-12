@@ -1,3 +1,11 @@
+// === Logout ===
+// Clears session-related keys and returns to the login page.
+function logout() {
+  localStorage.removeItem("mintchaUser");
+  localStorage.removeItem("mintchaRole");
+  window.location.href = "index.html";
+}
+
 // === Hamburger sidebar toggle (site-wide, runs on every page) ===
 document.addEventListener("DOMContentLoaded", () => {
   const sidebar = document.querySelector(".sidebar");
@@ -16,18 +24,18 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.appendChild(overlay);
 
   function openSidebar() {
-  sidebar.classList.add("open");
-  overlay.classList.add("show");
-  toggleBtn.textContent = "✕";
-  document.body.classList.add("sidebar-open"); // 👈 add this
-}
+    sidebar.classList.add("open");
+    overlay.classList.add("show");
+    toggleBtn.textContent = "✕";
+    document.body.classList.add("sidebar-open");
+  }
 
-function closeSidebar() {
-  sidebar.classList.remove("open");
-  overlay.classList.remove("show");
-  toggleBtn.textContent = "☰";
-  document.body.classList.remove("sidebar-open"); // 👈 add this
-}
+  function closeSidebar() {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("show");
+    toggleBtn.textContent = "☰";
+    document.body.classList.remove("sidebar-open");
+  }
 
   toggleBtn.addEventListener("click", () => {
     sidebar.classList.contains("open") ? closeSidebar() : openSidebar();

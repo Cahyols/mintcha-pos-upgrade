@@ -158,6 +158,12 @@
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 12px;
     }
+    .summary-box .sub-label {
+  font-size: .7rem;
+  color: #e65100;
+  font-weight: 700;
+  margin-top: 2px;
+}
     .summary-box {
       display: flex;
       flex-direction: column;
@@ -192,7 +198,7 @@
       <h2 class="brand">🍃 Mintcha</h2>
 
       <div class="nav-section">
-        <p class="section-title">Main Menu</p>
+        
         <ul>
           <li class="active"><a href="dashboard.html">Dashboard</a></li>
           <li><a href="sales-overview.html">Sales Overview</a></li>
@@ -201,14 +207,14 @@
           <li><a href="menu-recipes.html">Menu Recipes</a></li>
           <!-- Admin-only -->
           <li id="adminStockUsageLink" style="display:none;"><a href="stock-usage.html">Stock Usage</a></li>
+          <li></li>
+          <li></li>
+          <li><a href="#" onclick="logout()">Logout</a></li>
         </ul>
       </div>
 
       <div class="nav-section">
-        <p class="section-title">General</p>
-        <ul>
-          <li><a href="#" onclick="logout()">Logout</a></li>
-        </ul>
+        
       </div>
     </aside>
 
@@ -233,8 +239,8 @@
             <button id="summaryTodayBtn" class="admin-btn">Today</button>
           </div>
           <div id="todaySummaryContent"></div>
-          <div id="todaySummaryContent"></div>
           <div id="drinkBreakdown"></div>
+
         </section>
 
         <!-- === Low Stock Alerts Section === -->
@@ -245,12 +251,12 @@
           </ul>
         </section>
       </div>
-    </section>> 
+    </section>>
 
     
   </div>
 
-  <!-- === Scripts === -->    
+  <!-- === Scripts === -->
   <script src="js/common.js"></script>
   <script src="js/dashboard.js"></script>
 
