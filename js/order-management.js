@@ -91,7 +91,12 @@ function renderMenu(mode = "view") {
 
     if (mode === "editPrices") {
       div.innerHTML = `
-        <strong>${item.name}</strong>
+        <input
+              type="text"
+              value="${item.name.replace(/"/g, "&quot;")}"
+              class="name-input"
+              data-index="${index}"
+              aria-label="Name for ${item.name}">
         <span class="price-tag">RM <input
               type="number"
               step="0.01"
@@ -277,7 +282,7 @@ function renderPriceEditorIfAdmin() {
   if (role !== "admin") return;
 
   priceControls.innerHTML = `
-    <button id="toggleEditPrices" class="edit-btn">🖊️ Edit Prices</button>
+    <button id="toggleEditPrices" class="edit-btn">🖊️ Edit Menu</button>
     <button id="toggleReorder" class="edit-btn">🔀 Reorder Menu</button>
   `;
 
@@ -285,25 +290,46 @@ function renderPriceEditorIfAdmin() {
   const editBtn = document.getElementById("toggleEditPrices");
   const reorderBtn = document.getElementById("toggleReorder");
 
-  editBtn.addEventListener("click", () => {
+ editBtn.addEventListener("click", () => {
     if (currentMode === "editPrices") {
-      const inputs = document.querySelectorAll(".price-input");
-      inputs.forEach((input) => {
+      const priceInputs = document.querySelectorAll(".price-input");
+      const nameInputs = document.querySelectorAll(".name-input");
+
+      // Validate names first — don't allow saving a blank name
+      for (const input of nameInputs) {
+        if (!input.value.trim()) {
+          alert("Item name can't be empty.");
+          return;
+        }
+      }
+
+      const renames = []; // { oldName, newName } — for cascading elsewhere if needed
+
+      nameInputs.forEach((input) => {
+        const idx = input.dataset.index;
+        const newName = input.value.trim();
+        const oldName = sampleMenu[idx].name;
+        if (newName !== oldName) renames.push({ oldName, newName });
+        sampleMenu[idx].name = newName;
+      });
+
+      priceInputs.forEach((input) => {
         const idx = input.dataset.index;
         const newPrice = parseFloat(input.value);
         if (!isNaN(newPrice)) sampleMenu[idx].price = newPrice;
       });
+
       localStorage.setItem("menuItems", JSON.stringify(sampleMenu));
 
       currentMode = "view";
-      editBtn.textContent = "🖊️ Edit Prices";
+      editBtn.textContent = "🖊️ Edit Menu";
       editBtn.classList.remove("active-mode");
       reorderBtn.disabled = false;
       renderMenu("view");
-      showOrderToast("Prices saved");
+      showOrderToast(renames.length ? "Menu updated (name & price)" : "Prices saved");
     } else {
       currentMode = "editPrices";
-      editBtn.textContent = "💾 Save Prices";
+      editBtn.textContent = "💾 Save Menu";
       editBtn.classList.add("active-mode");
       reorderBtn.disabled = true;
       renderMenu("editPrices");

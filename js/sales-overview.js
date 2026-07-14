@@ -153,22 +153,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const minutesElapsed = saleTime ? (now - saleTime) / 60000 : 0;
       const isRefunded = sale.status === "Refunded";
       const refundedClass = isRefunded ? "refunded-row" : "";
-      const allowRefund = !isRefunded && minutesElapsed >= 15 && minutesElapsed < 30;
 
+      // Still computed so the Status filter dropdown keeps working,
+      // even though we no longer render a Status column/badge.
       let statusText = "";
-      let statusBadge = "";
-
       if (isRefunded) {
         statusText = "Refunded";
-        statusBadge = `<span class="badge badge-refunded" title="${sale.refundReason || "No reason provided"}">Refunded</span>`;
       } else if (minutesElapsed < 15) {
         statusText = "Preparing";
-        statusBadge = `<span class="badge badge-preparing">Preparing</span>`;
       } else {
         statusText = "Completed";
-        statusBadge = `<span class="badge badge-completed">Completed</span>`;
       }
-
       sale._derivedStatus = statusText;
 
       const row = document.createElement("tr");
@@ -192,37 +187,28 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${sale.discountType || "None"}</td>
       `;
 
-      const statusCell = document.createElement("td");
-
-      if (allowRefund) {
-        const refundBtn = document.createElement("button");
-        refundBtn.textContent = "Refund";
-        refundBtn.onclick = () => {
-          if (confirm(`Refund order ${sale.id}?`)) {
-            const reason = prompt("Enter refund reason:");
-            if (reason) {
-              sale.status = "Refunded";
-              sale.refundReason = reason;
-              sale.refundedAt = new Date().toISOString();
-
-              const allSales = loadSales();
-              const idx = allSales.findIndex(s => s.id === sale.id);
-              if (idx !== -1) {
-                allSales[idx] = sale;
-                localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
-              }
-
-              applyFilters();
-            }
+      // === Delete column (replaces Status) ===
+      const deleteCell = document.createElement("td");
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "🗑️ Delete";
+      deleteBtn.className = "admin-btn delete-sale-btn";
+      deleteBtn.style.backgroundColor = "#c62828";
+      deleteBtn.style.color = "#fff";
+      deleteBtn.onclick = () => {
+        if (confirm(`Delete order ${sale.id}? This cannot be undone.`)) {
+          const allSales = loadSales();
+          const idx = allSales.findIndex(s => s.id === sale.id);
+          if (idx !== -1) {
+            allSales.splice(idx, 1);
+            localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
           }
-        };
-        statusCell.appendChild(refundBtn);
-      } else {
-        statusCell.innerHTML = statusBadge;
-      }
+          applyFilters();
+        }
+      };
+      deleteCell.appendChild(deleteBtn);
+      row.appendChild(deleteCell);
 
-      row.appendChild(statusCell);
-        // === Receipt column ===
+      // === Receipt column ===
       const receiptCell = document.createElement("td");
       const printBtn = document.createElement("button");
       printBtn.textContent = "🖨️ Print";
@@ -355,6 +341,7 @@ function exportSalesToJSON() {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
 function viewReceipt(saleId) {
   const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
   const sale = sales.find(s => s.id === saleId);
