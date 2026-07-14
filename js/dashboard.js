@@ -73,116 +73,133 @@ document.addEventListener("DOMContentLoaded", () => {
     `).join("");
   }
 
-  // === Today's Sales & Cup Summary (Admin only) ===
-  // === Sales & Cup Summary for a given date (Admin only) ===
-  function renderSummaryForDate(targetDate) {
+  // ===================================================================
+  // === Sales / Cup Summary (Admin only) — supports Day/Week/Month ===
+  // ===================================================================
+
+  let currentViewMode = "day"; // "day" | "week" | "month"
+
+  // Returns [startOfRange, endOfRange] (inclusive, local time) for a given
+  // mode and reference date.
+  function getRangeForMode(mode, refDate) {
+    const start = new Date(refDate);
+    const end = new Date(refDate);
+
+    if (mode === "day") {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    } else if (mode === "week") {
+      // Week = Monday–Sunday containing refDate
+      const day = start.getDay(); // 0 = Sun, 1 = Mon, ...
+      const diffToMonday = day === 0 ? -6 : 1 - day;
+      start.setDate(start.getDate() + diffToMonday);
+      start.setHours(0, 0, 0, 0);
+
+      end.setTime(start.getTime());
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+    } else if (mode === "month") {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+
+      end.setMonth(start.getMonth() + 1, 0); // day 0 of next month = last day of this month
+      end.setHours(23, 59, 59, 999);
+    }
+
+    return [start, end];
+  }
+
+  function formatRangeLabel(mode, start, end) {
+    const opts = { day: "numeric", month: "long", year: "numeric" };
+    if (mode === "day") {
+      return start.toLocaleDateString("en-MY", { weekday: "long", ...opts });
+    }
+    if (mode === "week") {
+      const startStr = start.toLocaleDateString("en-MY", { day: "numeric", month: "short" });
+      const endStr = end.toLocaleDateString("en-MY", opts);
+      return `${startStr} – ${endStr}`;
+    }
+    // month
+    return start.toLocaleDateString("en-MY", { month: "long", year: "numeric" });
+  }
+
+  // === Sales & Cup Summary for a given date range ===
+  function renderSummaryForRange(startDate, endDate, mode) {
     const role = localStorage.getItem("mintchaRole");
     const summaryCard = document.getElementById("todaySummaryCard");
     const summaryContent = document.getElementById("todaySummaryContent");
+    const breakdownEl = document.getElementById("drinkBreakdown");
     if (!summaryCard || !summaryContent) return;
     if (role !== "admin") return; // stays hidden for non-admins
 
     summaryCard.style.display = "block";
 
-    const targetStr = targetDate.toDateString();
-    const isToday = targetStr === new Date().toDateString();
+    const isToday = mode === "day" && startDate.toDateString() === new Date().toDateString();
 
-    // Update heading title + date label
     const titleEl = document.getElementById("summaryTitle");
     const dateLabel = document.getElementById("todaySummaryDate");
-    if (titleEl) titleEl.textContent = isToday ? "Today's Summary" : "Summary";
-    if (dateLabel) {
-      dateLabel.textContent = targetDate.toLocaleDateString("en-MY", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
+    if (titleEl) {
+      titleEl.textContent = isToday
+        ? "Today's Summary"
+        : mode === "day" ? "Summary" : mode === "week" ? "Weekly Summary" : "Monthly Summary";
     }
+    if (dateLabel) dateLabel.textContent = formatRangeLabel(mode, startDate, endDate);
 
     const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
 
-    // Only count sales made on the target date, excluding refunded orders
+    // Only count sales within the range, excluding refunded orders
     // from revenue/cup totals so the numbers reflect real business activity.
-    const daySales = allSales.filter(sale => {
+    const rangeSales = allSales.filter(sale => {
       if (sale.status === "Refunded") return false;
       const saleDate = parseDateSafe(sale.date);
       if (!saleDate) return false;
-      return saleDate.toDateString() === targetStr;
+      return saleDate >= startDate && saleDate <= endDate;
     });
 
     let totalRevenue = 0;
-    let totalSubtotal = 0; 
+    let totalSubtotal = 0;
     let paidCups = 0;
     let freeCups = 0;
     let discountedCups = 0;
-     let totalDiscountAmount = 0; // 👈 new
-      let totalFreeValue = 0; // 👈 new — value of free drinks at full price
-
-
-    daySales.forEach(sale => {
-      totalRevenue += parseFloat(sale.total || 0);
-        totalSubtotal += parseFloat(sale.subtotal || 0);
-       totalDiscountAmount += parseFloat(sale.discountAmount || 0); // 👈 new
-      const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
-
-      // === Per-drink breakdown for the selected day ===
+    let totalDiscountAmount = 0;
+    let totalFreeValue = 0;
     const drinkCounts = {};
-    daySales.forEach(sale => {
-      (sale.items || []).forEach(item => {
-        drinkCounts[item.name] = (drinkCounts[item.name] || 0) + (item.qty || 0);
-      });
-    });
 
-    const sortedDrinks = Object.entries(drinkCounts).sort((a, b) => b[1] - a[1]);
-    const maxQty = sortedDrinks.length ? sortedDrinks[0][1] : 0;
-
-    const breakdownEl = document.getElementById("drinkBreakdown");
-    if (breakdownEl) {
-      if (!sortedDrinks.length) {
-        breakdownEl.innerHTML = "";
-      } else {
-        breakdownEl.innerHTML = `
-          <div class="drink-breakdown">
-            <h4>🥤 Drinks Sold${isToday ? " Today" : ""}</h4>
-            ${sortedDrinks.map(([name, qty]) => `
-              <div class="drink-row">
-                <span class="drink-name">${name}</span>
-                <div class="drink-bar-track">
-                  <div class="drink-bar-fill" style="width:${maxQty ? (qty / maxQty) * 100 : 0}%"></div>
-                </div>
-                <span class="drink-qty">${qty}</span>
-              </div>
-            `).join("")}
-          </div>
-        `;
-      }
-    }
+    rangeSales.forEach(sale => {
+      totalRevenue += parseFloat(sale.total || 0);
+      totalSubtotal += parseFloat(sale.subtotal || 0);
+      totalDiscountAmount += parseFloat(sale.discountAmount || 0);
+      const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
 
       if (sale.discountType === "Free") {
         freeCups += cupsInSale;
         // Value of the free items is just the subtotal of that sale,
         // since a "Free" discount zeroes out the whole order's price.
-        totalFreeValue += parseFloat(sale.subtotal || 0); // 👈 new
+        totalFreeValue += parseFloat(sale.subtotal || 0);
       } else if (sale.discountType && sale.discountType !== "None") {
         discountedCups += cupsInSale;
       } else {
         paidCups += cupsInSale;
       }
+
+      (sale.items || []).forEach(item => {
+        drinkCounts[item.name] = (drinkCounts[item.name] || 0) + (item.qty || 0);
+      });
     });
 
     const totalCups = paidCups + freeCups + discountedCups;
 
-    // Friendly empty state if no sales happened on the chosen day at all
-   if (!daySales.length) {
+    // Friendly empty state if no sales happened in the chosen range at all
+    if (!rangeSales.length) {
       summaryContent.innerHTML = `
         <div class="summary-hero">
-          <span class="label">Total Sales</span>
-          <span class="value">RM0.00</span>
+          <div class="hero-main">
+            <span class="label">Total Sales</span>
+            <span class="value">RM0.00</span>
+          </div>
         </div>
-        <p style="text-align:center; color:#999; margin: 10px 0 0;">No sales recorded on this date.</p>
+        <p style="text-align:center; color:#999; margin: 10px 0 0;">No sales recorded in this period.</p>
       `;
-      const breakdownEl = document.getElementById("drinkBreakdown");
       if (breakdownEl) breakdownEl.innerHTML = "";
       return;
     }
@@ -223,7 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="value">${paidCups}</span>
           <span class="label">Full-Price</span>
         </div>
-       <div class="summary-box discount">
+        <div class="summary-box discount">
           <span class="icon">🏷️</span>
           <span class="value">${discountedCups}</span>
           <span class="label">Discounted</span>
@@ -233,16 +250,52 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="icon">🎉</span>
           <span class="value">${freeCups}</span>
           <span class="label">Free</span>
-          <span class="sub-label">RM${totalFreeValue.toFixed(2)}</span>
+          <span class="sub-label">worth RM${totalFreeValue.toFixed(2)}</span>
         </div>
       </div>
     `;
+
+    // === Per-drink breakdown for the selected range ===
+    if (breakdownEl) {
+      const sortedDrinks = Object.entries(drinkCounts).sort((a, b) => b[1] - a[1]);
+      const maxQty = sortedDrinks.length ? sortedDrinks[0][1] : 0;
+
+      if (!sortedDrinks.length) {
+        breakdownEl.innerHTML = "";
+      } else {
+        breakdownEl.innerHTML = `
+          <div class="drink-breakdown">
+            <h4>🥤 Drinks Sold${isToday ? " Today" : ""}</h4>
+            ${sortedDrinks.map(([name, qty]) => `
+              <div class="drink-row">
+                <span class="drink-name">${name}</span>
+                <div class="drink-bar-track">
+                  <div class="drink-bar-fill" style="width:${maxQty ? (qty / maxQty) * 100 : 0}%"></div>
+                </div>
+                <span class="drink-qty">${qty}</span>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+    }
   }
 
-  // === Wire up the date picker ===
+  // Re-renders using whatever date is currently in the picker + current mode
+  function refreshSummary() {
+    const datePicker = document.getElementById("summaryDatePicker");
+    if (!datePicker || !datePicker.value) return;
+    const [y, m, d] = datePicker.value.split("-").map(Number);
+    const refDate = new Date(y, m - 1, d);
+    const [start, end] = getRangeForMode(currentViewMode, refDate);
+    renderSummaryForRange(start, end, currentViewMode);
+  }
+
+  // === Wire up the date picker + mode toggle ===
   function setupSummaryDatePicker() {
     const datePicker = document.getElementById("summaryDatePicker");
     const todayBtn = document.getElementById("summaryTodayBtn");
+    const modeButtons = document.querySelectorAll(".view-mode-btn");
     if (!datePicker) return;
 
     // Default the input to today's date, in the yyyy-mm-dd format <input type="date"> requires
@@ -251,21 +304,25 @@ document.addEventListener("DOMContentLoaded", () => {
     datePicker.value = isoToday;
     datePicker.max = isoToday; // can't pick a future date
 
-    datePicker.addEventListener("change", () => {
-      if (!datePicker.value) return;
-      // datePicker.value is "YYYY-MM-DD" — construct as local time, not UTC,
-      // so it matches the local-time dates parseDateSafe produces elsewhere.
-      const [y, m, d] = datePicker.value.split("-").map(Number);
-      renderSummaryForDate(new Date(y, m - 1, d));
-    });
+    datePicker.addEventListener("change", refreshSummary);
 
     todayBtn?.addEventListener("click", () => {
       datePicker.value = isoToday;
-      renderSummaryForDate(new Date());
+      refreshSummary();
+    });
+
+    modeButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        modeButtons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentViewMode = btn.dataset.mode;
+        refreshSummary();
+      });
     });
   }
 
   setupSummaryDatePicker();
-  renderSummaryForDate(new Date());
+  refreshSummary();
+
   renderLowStockAlerts();
 });

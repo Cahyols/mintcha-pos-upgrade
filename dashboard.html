@@ -203,6 +203,28 @@
       padding: 14px 10px;
       border: 1px solid #eee;
     }
+    .view-mode-toggle {
+  display: flex;
+  border: 1px solid #00897b;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.view-mode-btn {
+  padding: 5px 14px;
+  font-size: .8rem;
+  border: none;
+  background: #fff;
+  color: #00796b;
+  cursor: pointer;
+  border-right: 1px solid #00897b;
+}
+.view-mode-btn:last-child { border-right: none; }
+.view-mode-btn.active {
+  background: #00897b;
+  color: #fff;
+  font-weight: 700;
+}
+.view-mode-btn:hover:not(.active) { background: #e0f2f1; }
     .summary-box .icon { font-size: 1.4rem; margin-bottom: 4px; }
     .summary-box .value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
     .summary-box .label { font-size: .72rem; color: #777; text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
@@ -264,6 +286,11 @@
             <span id="todaySummaryDate" class="summary-date"></span>
           </h3>
            <div class="summary-date-filter">
+            <div class="view-mode-toggle">
+              <button class="view-mode-btn active" data-mode="day">Day</button>
+              <button class="view-mode-btn" data-mode="week">Week</button>
+              <button class="view-mode-btn" data-mode="month">Month</button>
+            </div>
             <label for="summaryDatePicker">View date:</label>
             <input type="date" id="summaryDatePicker" />
             <button id="summaryTodayBtn" class="admin-btn">Today</button>
