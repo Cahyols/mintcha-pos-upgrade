@@ -19,7 +19,7 @@
   margin: 0;
 }
 .dashboard-card h3 {
-  justify-content: space-between; /* was: no justify-content, so this pushes the date to the right */
+  justify-content: space-between;
 }
 .summary-date-filter {
   display: flex;
@@ -238,6 +238,82 @@
     .summary-box.free    { background: #fce4ec; }
     .summary-box.free    .value { color: #c2185b; }
 
+    /* === Category breakdown === */
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #eee;
+    }
+    .category-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+      border-radius: 10px;
+      padding: 12px 10px;
+      border: 1px solid #eee;
+    }
+    .cat-drink-list {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,.08);
+  width: 100%;
+}
+.cat-drink-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: .75rem;
+  padding: 2px 0;
+  color: #444;
+}
+.cat-drink-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cat-drink-qty {
+  font-weight: 700;
+  color: #333;
+}
+    .category-cups { font-size: 1.4rem; font-weight: 800; margin-top: 2px; }
+    .category-sub { font-size: .72rem; color: #777; }
+
+    .cat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      padding: 3px 10px;
+      border-radius: 999px;
+      align-self: center;
+    }
+    .cat-badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .category-box.cat-matcha  { background: #e4f3ea; }
+    .category-box.cat-coffee  { background: #f1e6da; }
+    .category-box.cat-dessert { background: #fbe4ea; }
+    .category-box.cat-uncat   { background: #f0f0f0; }
+
+    .cat-badge.cat-matcha  { background: rgba(255,255,255,.6); color: #1f7a4d; }
+    .cat-badge.cat-coffee  { background: rgba(255,255,255,.6); color: #7a4b1f; }
+    .cat-badge.cat-dessert { background: rgba(255,255,255,.6); color: #a3184f; }
+    .cat-badge.cat-uncat   { background: rgba(255,255,255,.6); color: #666; }
+
     @media (max-width: 500px) {
       .summary-hero .value { font-size: 1.6rem; }
     }
@@ -250,7 +326,6 @@
       <h2 class="brand">🍃 Mintcha</h2>
 
       <div class="nav-section">
-        
         <ul>
           <li class="active"><a href="dashboard.html">Dashboard</a></li>
           <li><a href="sales-overview.html">Sales Overview</a></li>
@@ -265,9 +340,7 @@
         </ul>
       </div>
 
-      <div class="nav-section">
-        
-      </div>
+      <div class="nav-section"></div>
     </aside>
 
     <!-- === MAIN CONTENT === -->
@@ -279,13 +352,12 @@
 
       <div class="page-content">
         <!-- === Today's Summary (Admin only) === -->
-         
-      <section id="todaySummaryCard" class="dashboard-card" style="display:none;">
+        <section id="todaySummaryCard" class="dashboard-card" style="display:none;">
           <h3>
             📊 Today's Summary
             <span id="todaySummaryDate" class="summary-date"></span>
           </h3>
-           <div class="summary-date-filter">
+          <div class="summary-date-filter">
             <div class="view-mode-toggle">
               <button class="view-mode-btn active" data-mode="day">Day</button>
               <button class="view-mode-btn" data-mode="week">Week</button>
@@ -296,8 +368,7 @@
             <button id="summaryTodayBtn" class="admin-btn">Today</button>
           </div>
           <div id="todaySummaryContent"></div>
-          <div id="drinkBreakdown"></div>
-
+          
         </section>
 
         <!-- === Low Stock Alerts Section === -->
@@ -308,21 +379,18 @@
           </ul>
         </section>
       </div>
-    </section>>
-
-    
+    </section>
   </div>
 
   <!-- === Scripts === -->
   <script src="js/common.js"></script>
   <script src="js/dashboard.js"></script>
 
-
   <script>
     // Show "Stock Usage" link only for admins
     const role = localStorage.getItem("mintchaRole");
     const user = localStorage.getItem("mintchaUser");
-    
+
     if (role === "admin") {
       const usageLink = document.getElementById("adminStockUsageLink");
       if (usageLink) usageLink.style.display = "list-item";

@@ -5,6 +5,302 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Menu Recipes – Mintcha POS</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* --- Menu Recipes page-specific styles --- */
+    .menu-editor-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .add-menu-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .add-menu-row {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr 2fr auto;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .add-menu-row input,
+    .add-menu-row .cat-select-row {
+      min-width: 0;
+    }
+    .add-menu-row input {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    @media (max-width: 900px) {
+      .add-menu-row { grid-template-columns: 1fr; }
+    }
+
+    .menu-editor {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .menu-editor { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e5e5e5;
+      padding: 18px;
+    }
+
+    /* --- Category tokens --- */
+    .cat-matcha  { --cat-bg: #e4f3ea; --cat-fg: #1f7a4d; --cat-dot: #2fa66a; }
+    .cat-coffee  { --cat-bg: #f1e6da; --cat-fg: #7a4b1f; --cat-dot: #a9702f; }
+    .cat-dessert { --cat-bg: #fbe4ea; --cat-fg: #a3184f; --cat-dot: #e0507e; }
+
+    .cat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--cat-bg, #eee);
+      color: var(--cat-fg, #555);
+    }
+    .cat-badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cat-dot, #999);
+    }
+
+    /* --- Left panel: menu list --- */
+    .menu-list-toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .menu-search {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .cat-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .cat-tab {
+      border: 1px solid #ddd;
+      background: #fafafa;
+      color: #555;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .cat-tab.active {
+      background: #14746f;
+      border-color: #14746f;
+      color: #fff;
+    }
+
+    .menu-item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+    .menu-item-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #fff;
+      transition: border-color .12s ease, background .12s ease;
+    }
+    .menu-item-card:hover { border-color: #14746f; }
+    .menu-item-card.selected {
+      border-color: #14746f;
+      background: #eef7f6;
+    }
+    .menu-item-main { display: flex; flex-direction: column; gap: 4px; }
+    .menu-item-name { font-weight: 600; font-size: 14px; color: #222; }
+    .menu-item-sub { display: flex; align-items: center; gap: 8px; }
+    .menu-item-price { font-size: 12px; color: #777; }
+    .menu-item-ingcount { font-size: 11px; color: #999; }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px 10px;
+      color: #999;
+      font-size: 13px;
+    }
+
+    /* --- Add menu form --- */
+    .menu-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #eee;
+    }
+    .menu-form input,
+    .menu-form select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .cat-select-row {
+      display: flex;
+      gap: 8px;
+    }
+    .cat-choice {
+      flex: 1;
+      text-align: center;
+      padding: 8px 6px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      background: #fafafa;
+    }
+    .cat-choice.cat-matcha.active  { border-color: var(--cat-dot); background: var(--cat-bg); color: var(--cat-fg); }
+    .cat-choice.cat-coffee.active  { border-color: var(--cat-dot); background: var(--cat-bg); color: var(--cat-fg); }
+    .cat-choice.cat-dessert.active { border-color: var(--cat-dot); background: var(--cat-bg); color: var(--cat-fg); }
+
+    .btn-primary {
+      background: #14746f;
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary:hover { background: #0f5a56; }
+
+    .import-export {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .btn-secondary {
+      background: #fff;
+      border: 1px solid #ddd;
+      color: #333;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-secondary:hover { border-color: #14746f; color: #14746f; }
+
+    /* --- Right panel: recipe editor --- */
+    #recipeEditor.hidden { display: none; }
+    .recipe-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .recipe-header h3 { margin: 0; font-size: 18px; }
+    .recipe-header .cat-badge { margin-left: 8px; }
+
+    .ingredient-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: #fafafa;
+    }
+    .ingredient-row span { font-size: 14px; color: #333; }
+    .remove-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #c0392b;
+      opacity: 0.7;
+    }
+    .remove-btn:hover { opacity: 1; }
+
+    .ingredient-inputs {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 8px;
+      margin: 14px 0;
+    }
+    .ingredient-inputs input,
+    .ingredient-inputs button {
+      padding: 9px 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .recipe-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .delete-drink-btn {
+      background: #fff;
+      border: 1px solid #e0a0a0;
+      color: #c0392b;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .delete-drink-btn:hover { background: #fdecec; }
+
+    /* --- Toast --- */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #222;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.error { background: #a3182f; }
+  </style>
 </head>
 <body>
   <!-- === MENU RECIPES PAGE === -->
@@ -33,39 +329,107 @@
         <h1>Menu Recipe Editor</h1>
       </header>
 
-      <div class="menu-editor">
-        <!-- Admin-only controls -->
-        <div class="menu-form" id="adminControls">
-          <input type="text" id="newMenuName" placeholder="New Drink Name" />
-          <input type="number" id="newMenuPrice" placeholder="Price (RM)" step="0.01" />
-          <button id="addMenuItem">+ Add Drink</button>
-
-          <!-- Import/Export CSV -->
+      <div class="menu-editor-stack">
+        <!-- TOP: Add Menu (full width, compact) -->
+        <div class="panel add-menu-panel" id="adminControls">
+          <div class="add-menu-row">
+            <input type="text" id="newMenuName" placeholder="Drink name" />
+            <input type="number" id="newMenuPrice" placeholder="Price (RM)" step="0.01" />
+            <div class="cat-select-row" id="newMenuCategoryRow">
+              <div class="cat-choice cat-matcha" data-category="matcha">Matcha</div>
+              <div class="cat-choice cat-coffee" data-category="coffee">Coffee</div>
+              <div class="cat-choice cat-dessert" data-category="dessert">Dessert</div>
+            </div>
+            <button class="btn-primary" id="addMenuItem">+ Add Menu</button>
+          </div>
           <div class="import-export">
-            <input type="file" id="importCSV" accept=".csv" />
-            <button id="exportCSV">Export CSV</button>
+            <input type="file" id="importCSV" accept=".csv" style="font-size:12px;" />
+            <button class="btn-secondary" id="exportCSV">Export CSV</button>
           </div>
         </div>
 
-        <label for="menuSelect"><strong>Select Menu:</strong></label>
-        <select id="menuSelect"></select>
-
-        <div id="recipeEditor" class="hidden">
-          <h3>Ingredients for: <span id="selectedDrinkName"></span></h3>
-          <div id="ingredientList"></div>
-
-          <div class="ingredient-inputs">
-            <input type="text" id="ingredientName" placeholder="Ingredient name" />
-            <input type="number" id="ingredientQty" placeholder="Quantity" step="0.1" />
-            <input type="text" id="ingredientUnit" placeholder="Unit (ml, g, etc)" />
-            <button id="addIngredient">+ Add Ingredient</button>
+        <!-- BOTTOM: menu list + recipe editor -->
+        <div class="menu-editor">
+          <div class="panel">
+            <div class="menu-list-toolbar">
+              <input type="text" id="menuSearch" class="menu-search" placeholder="Search menu…" />
+              <div class="cat-tabs" id="catTabs">
+                <button class="cat-tab active" data-category="all">All</button>
+                <button class="cat-tab" data-category="matcha">Matcha</button>
+                <button class="cat-tab" data-category="coffee">Coffee</button>
+                <button class="cat-tab" data-category="dessert">Dessert</button>
+              </div>
+            </div>
+            <div class="menu-item-list" id="menuItemList"></div>
           </div>
 
-          <button id="saveRecipe">💾 Save Recipe</button>
+          <div class="panel" id="recipeEditor">
+            <div id="recipeEditorInner" class="hidden">
+              <div class="recipe-header">
+                <h3 id="selectedDrinkName"></h3>
+              </div>
+              <div class="edit-category-block">
+                <label class="edit-category-label">Category</label>
+                <div class="cat-select-row" id="editCategoryRow">
+                  <div class="cat-choice cat-matcha" data-category="matcha">Matcha</div>
+                  <div class="cat-choice cat-coffee" data-category="coffee">Coffee</div>
+                  <div class="cat-choice cat-dessert" data-category="dessert">Dessert</div>
+                </div>
+              </div>
+              <div id="ingredientList"></div>
+              <div class="ingredient-inputs">
+                <input type="text" id="ingredientName" placeholder="Ingredient name" />
+                <input type="number" id="ingredientQty" placeholder="Qty" step="0.1" />
+                <input type="text" id="ingredientUnit" placeholder="Unit" />
+                <button id="addIngredient">+ Add</button>
+              </div>
+              <div class="recipe-actions">
+                <button class="btn-primary" id="saveRecipe">💾 Save Recipe</button>
+                <button class="delete-drink-btn" id="deleteDrinkBtn">🗑️ Delete Drink</button>
+              </div>
+            </div>
+            <div class="empty-state" id="recipeEmptyState">Select a menu item on the left to edit its recipe.</div>
+          </div>
+        </div>
+      </div>
+
+        <!-- RIGHT: recipe editor -->
+        <div class="panel" id="recipeEditor" class="hidden">
+          <div id="recipeEditorInner" class="hidden">
+            <div class="recipe-header">
+              <h3 id="selectedDrinkName"></h3>
+            </div>
+
+            <div class="edit-category-block">
+              <label class="edit-category-label">Category</label>
+              <div class="cat-select-row" id="editCategoryRow">
+                <div class="cat-choice cat-matcha" data-category="matcha">Matcha</div>
+                <div class="cat-choice cat-coffee" data-category="coffee">Coffee</div>
+                <div class="cat-choice cat-dessert" data-category="dessert">Dessert</div>
+              </div>
+            </div>
+
+            <div id="ingredientList"></div>
+
+            <div class="ingredient-inputs">
+              <input type="text" id="ingredientName" placeholder="Ingredient name" />
+              <input type="number" id="ingredientQty" placeholder="Qty" step="0.1" />
+              <input type="text" id="ingredientUnit" placeholder="Unit" />
+              <button id="addIngredient">+ Add</button>
+            </div>
+
+            <div class="recipe-actions">
+              <button class="btn-primary" id="saveRecipe">💾 Save Recipe</button>
+              <button class="delete-drink-btn" id="deleteDrinkBtn">🗑️ Delete Drink</button>
+            </div>
+          </div>
+          <div class="empty-state" id="recipeEmptyState">Select a menu item on the left to edit its recipe.</div>
         </div>
       </div>
     </section>
   </div>
+
+  <div id="toast"></div>
 
   <script src="js/common.js"></script>
   <script src="js/menu-recipes.js"></script>

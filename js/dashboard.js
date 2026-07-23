@@ -5,10 +5,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function parseDateSafe(dateString) {
     if (!dateString) return null;
 
-    // 1️⃣ Try DD/MM/YYYY or DD-MM-YYYY FIRST (with optional time) — this matches
-    // what our own checkout actually saves (en-MY locale = day-first), so it
-    // must be checked before native Date() to avoid Date() silently
-    // misreading it as MM/DD/YYYY when the day is 12 or lower.
     const dtMatch = dateString.match(
       /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[ ,T]*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM|am|pm))?)?/
     );
@@ -33,8 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!isNaN(localDate.getTime())) return localDate;
     }
 
-    // 2️⃣ Fallback to native parser only if the regex didn't match at all
-    // (e.g. ISO strings like "2026-07-11T02:21:10.000Z")
     let d = new Date(dateString);
     if (!isNaN(d.getTime())) return d;
 
@@ -44,6 +38,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // Load stock from localStorage
   function loadStock() {
     return JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
+  }
+
+  // Load menu items (for category + price lookup) from localStorage
+  function loadMenuCategoryMap() {
+    const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
+    const map = {};
+    menuItems.forEach(item => {
+      map[item.name] = { category: item.category || "uncategorized", price: item.price || 0 };
+    });
+    return map;
   }
 
   // Reusable function to get low stock items
@@ -79,8 +83,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentViewMode = "day"; // "day" | "week" | "month"
 
-  // Returns [startOfRange, endOfRange] (inclusive, local time) for a given
-  // mode and reference date.
   function getRangeForMode(mode, refDate) {
     const start = new Date(refDate);
     const end = new Date(refDate);
@@ -89,8 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
     } else if (mode === "week") {
-      // Week = Monday–Sunday containing refDate
-      const day = start.getDay(); // 0 = Sun, 1 = Mon, ...
+      const day = start.getDay();
       const diffToMonday = day === 0 ? -6 : 1 - day;
       start.setDate(start.getDate() + diffToMonday);
       start.setHours(0, 0, 0, 0);
@@ -102,7 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
       start.setDate(1);
       start.setHours(0, 0, 0, 0);
 
-      end.setMonth(start.getMonth() + 1, 0); // day 0 of next month = last day of this month
+      end.setMonth(start.getMonth() + 1, 0);
       end.setHours(23, 59, 59, 999);
     }
 
@@ -119,8 +120,24 @@ document.addEventListener("DOMContentLoaded", () => {
       const endStr = end.toLocaleDateString("en-MY", opts);
       return `${startStr} – ${endStr}`;
     }
-    // month
     return start.toLocaleDateString("en-MY", { month: "long", year: "numeric" });
+  }
+
+  // Renders the small "drink · qty" rows inside a category box
+  function renderCategoryDrinksList(drinksMap) {
+    const entries = Object.entries(drinksMap).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return "";
+
+    return `
+      <div class="cat-drink-list">
+        ${entries.map(([name, qty]) => `
+          <div class="cat-drink-row">
+            <span class="cat-drink-name">${name}</span>
+            <span class="cat-drink-qty">${qty}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
   }
 
   // === Sales & Cup Summary for a given date range ===
@@ -128,7 +145,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const role = localStorage.getItem("mintchaRole");
     const summaryCard = document.getElementById("todaySummaryCard");
     const summaryContent = document.getElementById("todaySummaryContent");
-    const breakdownEl = document.getElementById("drinkBreakdown");
     if (!summaryCard || !summaryContent) return;
     if (role !== "admin") return; // stays hidden for non-admins
 
@@ -147,8 +163,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
 
-    // Only count sales within the range, excluding refunded orders
-    // from revenue/cup totals so the numbers reflect real business activity.
     const rangeSales = allSales.filter(sale => {
       if (sale.status === "Refunded") return false;
       const saleDate = parseDateSafe(sale.date);
@@ -163,7 +177,15 @@ document.addEventListener("DOMContentLoaded", () => {
     let discountedCups = 0;
     let totalDiscountAmount = 0;
     let totalFreeValue = 0;
-    const drinkCounts = {};
+
+    // Category breakdown setup (now includes per-drink counts within each category)
+    const menuCategoryMap = loadMenuCategoryMap();
+    const categoryTotals = {
+      matcha:  { cups: 0, revenue: 0, drinks: {} },
+      coffee:  { cups: 0, revenue: 0, drinks: {} },
+      dessert: { cups: 0, revenue: 0, drinks: {} },
+      uncategorized: { cups: 0, revenue: 0, drinks: {} }
+    };
 
     rangeSales.forEach(sale => {
       totalRevenue += parseFloat(sale.total || 0);
@@ -173,8 +195,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (sale.discountType === "Free") {
         freeCups += cupsInSale;
-        // Value of the free items is just the subtotal of that sale,
-        // since a "Free" discount zeroes out the whole order's price.
         totalFreeValue += parseFloat(sale.subtotal || 0);
       } else if (sale.discountType && sale.discountType !== "None") {
         discountedCups += cupsInSale;
@@ -183,7 +203,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       (sale.items || []).forEach(item => {
-        drinkCounts[item.name] = (drinkCounts[item.name] || 0) + (item.qty || 0);
+        const meta = menuCategoryMap[item.name] || { category: "uncategorized", price: 0 };
+        const cat = categoryTotals[meta.category] ? meta.category : "uncategorized";
+        const qty = item.qty || 0;
+        categoryTotals[cat].cups += qty;
+        categoryTotals[cat].revenue += meta.price * qty;
+        categoryTotals[cat].drinks[item.name] = (categoryTotals[cat].drinks[item.name] || 0) + qty;
       });
     });
 
@@ -200,7 +225,6 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
         <p style="text-align:center; color:#999; margin: 10px 0 0;">No sales recorded in this period.</p>
       `;
-      if (breakdownEl) breakdownEl.innerHTML = "";
       return;
     }
 
@@ -233,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="summary-box total">
           <span class="icon">🥤</span>
           <span class="value">${totalCups}</span>
-          <span class="label">Total Cups</span>
+          <span class="label">Total Transaction</span>
         </div>
         <div class="summary-box paid">
           <span class="icon">💰</span>
@@ -253,35 +277,27 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="sub-label">worth RM${totalFreeValue.toFixed(2)}</span>
         </div>
       </div>
-    `;
-
-    // === Per-drink breakdown for the selected range ===
-    if (breakdownEl) {
-      const sortedDrinks = Object.entries(drinkCounts).sort((a, b) => b[1] - a[1]);
-      const maxQty = sortedDrinks.length ? sortedDrinks[0][1] : 0;
-
-      if (!sortedDrinks.length) {
-        breakdownEl.innerHTML = "";
-      } else {
-        breakdownEl.innerHTML = `
-          <div class="drink-breakdown">
-            <h4>🥤 Drinks Sold${isToday ? " Today" : ""}</h4>
-            ${sortedDrinks.map(([name, qty]) => `
-              <div class="drink-row">
-                <span class="drink-name">${name}</span>
-                <div class="drink-bar-track">
-                  <div class="drink-bar-fill" style="width:${maxQty ? (qty / maxQty) * 100 : 0}%"></div>
-                </div>
-                <span class="drink-qty">${qty}</span>
-              </div>
-            `).join("")}
+      <div class="category-grid">
+        ${["matcha", "coffee", "dessert"].map(cat => `
+          <div class="category-box cat-${cat}">
+            <span class="cat-badge cat-${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+            <span class="category-cups">${categoryTotals[cat].cups}</span>
+            <span class="category-sub">cups · RM${categoryTotals[cat].revenue.toFixed(2)}</span>
+            ${renderCategoryDrinksList(categoryTotals[cat].drinks)}
           </div>
-        `;
-      }
-    }
+        `).join("")}
+        ${categoryTotals.uncategorized.cups > 0 ? `
+          <div class="category-box cat-uncat">
+            <span class="cat-badge cat-uncat">Uncategorized</span>
+            <span class="category-cups">${categoryTotals.uncategorized.cups}</span>
+            <span class="category-sub">cups · RM${categoryTotals.uncategorized.revenue.toFixed(2)}</span>
+            ${renderCategoryDrinksList(categoryTotals.uncategorized.drinks)}
+          </div>
+        ` : ""}
+      </div>
+    `;
   }
 
-  // Re-renders using whatever date is currently in the picker + current mode
   function refreshSummary() {
     const datePicker = document.getElementById("summaryDatePicker");
     if (!datePicker || !datePicker.value) return;
@@ -291,18 +307,16 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSummaryForRange(start, end, currentViewMode);
   }
 
-  // === Wire up the date picker + mode toggle ===
   function setupSummaryDatePicker() {
     const datePicker = document.getElementById("summaryDatePicker");
     const todayBtn = document.getElementById("summaryTodayBtn");
     const modeButtons = document.querySelectorAll(".view-mode-btn");
     if (!datePicker) return;
 
-    // Default the input to today's date, in the yyyy-mm-dd format <input type="date"> requires
     const today = new Date();
     const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     datePicker.value = isoToday;
-    datePicker.max = isoToday; // can't pick a future date
+    datePicker.max = isoToday;
 
     datePicker.addEventListener("change", refreshSummary);
 
