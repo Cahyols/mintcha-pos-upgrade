@@ -7,6 +7,10 @@ let appliedDiscount = null;
 // === Reorder (drag & drop) state ===
 let dragSrcIndex = null;
 
+// === Category filter state (Order Management menu grid) ===
+// Defaults to "matcha" so the page opens straight into that tab.
+let activeMenuCategoryFilter = "matcha";
+
 // === Menu card color tagging ===
 // 5 preset colors only, kept simple — no custom color picker needed.
 const CARD_COLORS = [
@@ -24,6 +28,7 @@ const CARD_COLORS = [
 const menuContainer = document.getElementById("menuItems");
 const priceControls = document.getElementById("priceControls");
 const menuEmptyState = document.getElementById("menuEmptyState");
+const menuCatTabs = document.getElementById("menuCatTabs");
 const cartList = document.getElementById("cartList");
 const cartEmptyState = document.getElementById("cartEmptyState");
 const summarySubtotal = document.getElementById("summarySubtotal");
@@ -62,6 +67,22 @@ function showOrderToast(message) {
   orderToastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
 }
 
+// === Category filter tabs ===
+// Wired once; reads activeMenuCategoryFilter and re-renders in "view" mode.
+// Admin edit/reorder modes intentionally keep showing the full menu
+// (filtering while editing/reordering would make items seem to "vanish").
+function setupMenuCategoryTabs() {
+  if (!menuCatTabs) return;
+  menuCatTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest(".menu-cat-tab");
+    if (!btn) return;
+    [...menuCatTabs.children].forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeMenuCategoryFilter = btn.dataset.category;
+    renderMenu("view");
+  });
+}
+
 // === Render Menu Items ===
 // mode: "view" (default, click-to-add) | "editPrices" | "reorder"
 // Legacy callers pass a boolean (true = editPrices, false/undefined = view) — normalized below.
@@ -76,9 +97,29 @@ function renderMenu(mode = "view") {
     menuEmptyState.classList.remove("hidden");
     return;
   }
-  menuEmptyState.classList.add("hidden");
 
-  sampleMenu.forEach((item, index) => {
+  // Category filter only applies in normal "view" mode. Editing/reordering
+  // always show everything so nothing appears to disappear mid-edit.
+  const visibleEntries = sampleMenu
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => {
+      if (mode !== "view") return true;
+      if (activeMenuCategoryFilter === "all") return true;
+      return (item.category || "uncategorized") === activeMenuCategoryFilter;
+    });
+
+  if (mode === "view" && !visibleEntries.length) {
+    menuEmptyState.classList.remove("hidden");
+    menuEmptyState.textContent = "No drinks in this category yet.";
+    return;
+  }
+  menuEmptyState.classList.add("hidden");
+  menuEmptyState.textContent = "";
+  if (!menuEmptyState.innerHTML.trim()) {
+    menuEmptyState.innerHTML = `No menu yettt yet. Add your first drink in <a href="menu-recipes.html">Menu Recipes</a>.`;
+  }
+
+  visibleEntries.forEach(({ item, index }) => {
     const div = document.createElement("div");
     div.className = "menu-item";
     div.dataset.index = index;
@@ -591,6 +632,7 @@ function generateOrderId() {
 document.addEventListener("DOMContentLoaded", () => {
   renderMenu();
   renderPriceEditorIfAdmin();
+  setupMenuCategoryTabs();
 
   const user = localStorage.getItem("mintchaUser");
   if (!user) {

@@ -22,6 +22,30 @@
       color: #777;
       margin-right: 2px;
     }
+    /* === Category filter tabs (same visual language as Menu Recipes) === */
+    .menu-cat-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .menu-cat-tab {
+      border: 1px solid #ddd;
+      background: #fafafa;
+      color: #555;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .menu-cat-tab:hover { border-color: #00897b; color: #00796b; }
+    .menu-cat-tab.active {
+      background: #00897b;
+      border-color: #00897b;
+      color: #fff;
+    }
     /* === Color tag dot + popover === */
 .menu-item { position: relative; } /* needed so the popover positions correctly */
 
@@ -242,6 +266,11 @@
           <div class="menu-panel-header">
             <h2>Menu</h2>
             <div id="priceControls"></div>
+          </div>
+          <div class="menu-cat-tabs" id="menuCatTabs">
+            <button class="menu-cat-tab active" data-category="matcha">Matcha</button>
+            <button class="menu-cat-tab" data-category="coffee">Coffee</button>
+            <button class="menu-cat-tab" data-category="dessert">Dessert</button>
           </div>
           <div class="menu-items" id="menuItems"></div>
           <div id="menuEmptyState" class="empty-state hidden">
