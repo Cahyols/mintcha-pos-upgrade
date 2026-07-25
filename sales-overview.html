@@ -80,11 +80,8 @@
   </div>
 </div>
 
-      <!-- === Export / Import Buttons for Admin === -->
+      <!-- === Export Buttons for Admin === -->
       <div id="exportControls" class="admin-controls"></div>
-
-      <!-- Hidden input used by the Import button -->
-      <input type="file" id="importSalesInput" accept=".xlsx,.xls" style="display:none" />
 
       <!-- === Sales Table === -->
       <div class="sales-table-wrapper">
@@ -116,16 +113,15 @@
   </div>
   <!-- === Receipt Modal (view-only, reused pattern from Order Management) === -->
   <div id="receiptModal" class="modal hidden">
-    
+
       <span id="closeReceiptModal" class="close">&times;</span>
       <div id="receiptContent"></div>
-    
+
   </div>
 
   <!-- === Scripts === -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="js/common.js"></script>
   <script src="js/sales-overview.js"></script>
-  
+
 </body>
 </html>
