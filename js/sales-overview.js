@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const cashierDisplay = document.getElementById("currentCashier");
   if (cashierDisplay) cashierDisplay.textContent = user;
 
-  // Admin Export Buttons
+  // Admin Export / Import Buttons
   if (role === "admin") {
     const exportControls = document.getElementById("exportControls");
 
@@ -35,6 +35,19 @@ document.addEventListener("DOMContentLoaded", () => {
       exportCSVBtn.onclick = exportToCSV;
       exportControls.appendChild(exportCSVBtn);
 
+      // === Import Sales (XLSX) ===
+      const importBtn = document.createElement("button");
+      importBtn.textContent = "📥 Import Sales (XLSX)";
+      importBtn.className = "admin-btn export-btn";
+      importBtn.onclick = () => document.getElementById("importSalesInput").click();
+      exportControls.appendChild(importBtn);
+
+      const importInput = document.getElementById("importSalesInput");
+      if (importInput) {
+        importInput.value = ""; // reset so re-selecting the same file still fires "change"
+        importInput.onchange = handleImportFile;
+      }
+
       const clearBtn = document.createElement("button");
       clearBtn.textContent = "🗑️ Clear All Sales";
       clearBtn.className = "admin-btn export-btn";
@@ -43,11 +56,23 @@ document.addEventListener("DOMContentLoaded", () => {
       clearBtn.onclick = () => {
         if (confirm("⚠️ Delete ALL sales data? This cannot be undone.")) {
           localStorage.removeItem("mintcha_sales");
+          localStorage.removeItem("mintcha_sales_undo_backup");
           alert("✅ Sales cleared.");
           location.reload();
         }
       };
       exportControls.appendChild(clearBtn);
+
+      // === Undo Last Import ===
+      const undoBtn = document.createElement("button");
+      undoBtn.id = "undoImportBtn";
+      undoBtn.textContent = "↩️ Undo Last Import";
+      undoBtn.className = "admin-btn export-btn";
+      undoBtn.style.backgroundColor = "#8a6d3b";
+      undoBtn.style.color = "#fff";
+      undoBtn.onclick = undoLastImport;
+      exportControls.appendChild(undoBtn);
+      refreshUndoButtonState();
     }
   }
 
@@ -340,6 +365,173 @@ function exportSalesToJSON() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+// === Undo Last Import ===
+function undoLastImport() {
+  const backupRaw = localStorage.getItem("mintcha_sales_undo_backup");
+  if (!backupRaw) {
+    alert("There's no recent import to undo.");
+    return;
+  }
+
+  let backup;
+  try {
+    backup = JSON.parse(backupRaw);
+  } catch (err) {
+    console.error(err);
+    alert("❌ The undo backup is corrupted and can't be restored.");
+    return;
+  }
+
+  const when = backup.timestamp ? new Date(backup.timestamp).toLocaleString() : "the last import";
+  if (!confirm(`Revert sales data back to how it was before your last import (${when})?`)) {
+    return;
+  }
+
+  localStorage.setItem("mintcha_sales", JSON.stringify(backup.data || []));
+  localStorage.removeItem("mintcha_sales_undo_backup");
+  alert("✅ Reverted to the state before the last import.");
+  location.reload();
+}
+
+function refreshUndoButtonState() {
+  const btn = document.getElementById("undoImportBtn");
+  if (!btn) return;
+  const hasBackup = !!localStorage.getItem("mintcha_sales_undo_backup");
+  btn.disabled = !hasBackup;
+  btn.style.opacity = hasBackup ? "1" : "0.5";
+  btn.style.cursor = hasBackup ? "pointer" : "not-allowed";
+}
+
+// === Import Sales from XLSX ===
+function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      // header:1 gives raw rows so we control the column mapping ourselves
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+      if (!rows.length) {
+        alert("The file is empty.");
+        return;
+      }
+
+      // Expect the same column order as exportToCSV():
+      // Order ID, Date, Cashier, Customer, Items, Total, Payment, Discount, Status, Refund Reason
+      const headerRow = rows[0].map(h => String(h).trim().toLowerCase());
+      const dataRows = rows.slice(1);
+
+      const col = (name) => headerRow.indexOf(name);
+      const idxId = col("order id");
+      const idxDate = col("date");
+      const idxCashier = col("cashier");
+      const idxCustomer = col("customer");
+      const idxItems = col("items");
+      const idxTotal = col("total");
+      const idxPayment = col("payment");
+      const idxDiscount = col("discount");
+      const idxStatus = col("status");
+      const idxRefundReason = col("refund reason");
+
+      if (idxId === -1 || idxTotal === -1) {
+        alert("This file doesn't match the expected Sales export format (missing 'Order ID' / 'Total' columns).");
+        return;
+      }
+
+      const existingSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+
+      // Snapshot current data BEFORE applying the import, so it can be undone.
+      // This only keeps the single most recent pre-import state (one level of undo).
+      localStorage.setItem("mintcha_sales_undo_backup", JSON.stringify({
+        timestamp: new Date().toISOString(),
+        data: existingSales
+      }));
+
+      // Map by ID so we can restore/update in place
+      const salesById = new Map(existingSales.map(s => [s.id, s]));
+
+      let restored = 0;   // ID didn't exist locally (was deleted) -> brought back
+      let updated = 0;    // ID exists locally, date matches -> safe refresh
+      let conflicts = 0;  // ID exists locally, but date differs -> likely ID reused by a different sale, skipped
+      let skippedBlank = 0;
+
+      dataRows.forEach(row => {
+        if (!row || row.every(cell => cell === "" || cell === undefined)) return;
+
+        const id = String(row[idxId] ?? "").trim();
+        if (!id) { skippedBlank++; return; }
+
+        const importedDate = String(row[idxDate] ?? "").trim();
+
+        // Parse "2xMatcha Muse | 1xAmericano" back into item objects
+        const itemsRaw = String(row[idxItems] ?? "");
+        const items = itemsRaw
+          .split("|")
+          .map(s => s.trim())
+          .filter(Boolean)
+          .map(part => {
+            const m = part.match(/^(\d+)\s*x\s*(.+)$/i);
+            return m
+              ? { qty: parseInt(m[1], 10), name: m[2].trim(), price: 0 }
+              : { qty: 1, name: part, price: 0 };
+          });
+
+        const sale = {
+          id,
+          date: importedDate,
+          cashier: String(row[idxCashier] ?? ""),
+          customer: String(row[idxCustomer] ?? ""),
+          items,
+          total: parseFloat(row[idxTotal]) || 0,
+          paymentMethod: String(row[idxPayment] ?? ""),
+          discountType: String(row[idxDiscount] ?? "None"),
+          status: String(row[idxStatus] ?? ""),
+          refundReason: idxRefundReason !== -1 ? String(row[idxRefundReason] ?? "") : ""
+        };
+
+        const existing = salesById.get(id);
+
+        if (!existing) {
+          // Not on record locally (e.g. it was deleted) -> restore it from the backup
+          salesById.set(id, sale);
+          restored++;
+        } else if (String(existing.date ?? "").trim() === importedDate) {
+          // Same ID, same date -> genuinely the same sale, safe to refresh
+          // Preserve fields the export doesn't carry (subtotal, discountAmount, item prices)
+          salesById.set(id, { ...existing, ...sale });
+          updated++;
+        } else {
+          // Same ID but different date -> this ID was likely reused by a newer sale.
+          // Don't overwrite current data with the old backup record.
+          conflicts++;
+        }
+      });
+
+      localStorage.setItem("mintcha_sales", JSON.stringify(Array.from(salesById.values())));
+      alert(
+        `✅ Restored ${restored} sale(s), updated ${updated} matching sale(s).\n` +
+        (conflicts ? `⚠️ ${conflicts} sale(s) skipped — Order ID exists locally with a different date (likely reused by a newer sale).\n` : "") +
+        (skippedBlank ? `Skipped ${skippedBlank} blank row(s).\n` : "") +
+        `If this wasn't the file you meant to import, click "↩️ Undo Last Import" to revert.`
+      );
+      location.reload();
+    } catch (err) {
+      console.error(err);
+      alert("❌ Failed to read the file. Make sure it's a valid .xlsx file.");
+    } finally {
+      e.target.value = ""; // allow re-selecting same file later
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
 }
 
 function viewReceipt(saleId) {
