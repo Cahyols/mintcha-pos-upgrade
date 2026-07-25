@@ -30,6 +30,10 @@
   color: #555;
   flex-wrap: wrap;
 }
+.range-nav-btn {
+  padding: 5px 10px;
+  font-weight: 700;
+}
 .summary-date-filter input[type="date"] {
   padding: 5px 8px;
   border: 1px solid #ddd;
@@ -203,6 +207,37 @@
       padding: 14px 10px;
       border: 1px solid #eee;
     }
+    /* === Discount line under each category box === */
+.category-discount {
+  display: block;
+  font-size: .72rem;
+  font-weight: 700;
+  color: #e65100;
+  margin-top: 2px;
+}
+
+/* === Compact the 4 top summary boxes (Total/Full-Price/Discounted/Free) === */
+.summary-grid {
+  gap: 8px;
+}
+.summary-box {
+  padding: 8px 6px;
+}
+.summary-box .icon {
+  font-size: 1.1rem;
+  margin-bottom: 2px;
+}
+.summary-box .value {
+  font-size: 1.15rem;
+}
+.summary-box .label {
+  font-size: .62rem;
+  margin-top: 2px;
+}
+.summary-box .sub-label {
+  font-size: .62rem;
+  margin-top: 0;
+}
     .view-mode-toggle {
   display: flex;
   border: 1px solid #00897b;
@@ -363,8 +398,10 @@
               <button class="view-mode-btn" data-mode="week">Week</button>
               <button class="view-mode-btn" data-mode="month">Month</button>
             </div>
+            <button id="summaryPrevBtn" class="admin-btn range-nav-btn" aria-label="Previous period">◀</button>
             <label for="summaryDatePicker">View date:</label>
             <input type="date" id="summaryDatePicker" />
+            <button id="summaryNextBtn" class="admin-btn range-nav-btn" aria-label="Next period">▶</button>
             <button id="summaryTodayBtn" class="admin-btn">Today</button>
           </div>
           <div id="todaySummaryContent"></div>

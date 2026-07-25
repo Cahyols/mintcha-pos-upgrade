@@ -180,37 +180,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Category breakdown setup (now includes per-drink counts within each category)
     const menuCategoryMap = loadMenuCategoryMap();
-    const categoryTotals = {
-      matcha:  { cups: 0, revenue: 0, drinks: {} },
-      coffee:  { cups: 0, revenue: 0, drinks: {} },
-      dessert: { cups: 0, revenue: 0, drinks: {} },
-      uncategorized: { cups: 0, revenue: 0, drinks: {} }
-    };
+   const categoryTotals = {
+  matcha:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
+  coffee:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
+  dessert: { cups: 0, revenue: 0, discount: 0, drinks: {} },
+  uncategorized: { cups: 0, revenue: 0, discount: 0, drinks: {} }
+};
 
-    rangeSales.forEach(sale => {
-      totalRevenue += parseFloat(sale.total || 0);
-      totalSubtotal += parseFloat(sale.subtotal || 0);
-      totalDiscountAmount += parseFloat(sale.discountAmount || 0);
-      const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
+   rangeSales.forEach(sale => {
+  totalRevenue += parseFloat(sale.total || 0);
+  totalSubtotal += parseFloat(sale.subtotal || 0);
+  totalDiscountAmount += parseFloat(sale.discountAmount || 0);
+  const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
 
-      if (sale.discountType === "Free") {
-        freeCups += cupsInSale;
-        totalFreeValue += parseFloat(sale.subtotal || 0);
-      } else if (sale.discountType && sale.discountType !== "None") {
-        discountedCups += cupsInSale;
-      } else {
-        paidCups += cupsInSale;
-      }
+  if (sale.discountType === "Free") {
+    freeCups += cupsInSale;
+    totalFreeValue += parseFloat(sale.subtotal || 0);
+  } else if (sale.discountType && sale.discountType !== "None") {
+    discountedCups += cupsInSale;
+  } else {
+    paidCups += cupsInSale;
+  }
 
-      (sale.items || []).forEach(item => {
-        const meta = menuCategoryMap[item.name] || { category: "uncategorized", price: 0 };
-        const cat = categoryTotals[meta.category] ? meta.category : "uncategorized";
-        const qty = item.qty || 0;
-        categoryTotals[cat].cups += qty;
-        categoryTotals[cat].revenue += meta.price * qty;
-        categoryTotals[cat].drinks[item.name] = (categoryTotals[cat].drinks[item.name] || 0) + qty;
-      });
+  // === First pass: bucket this sale's actual line totals by category ===
+  // (uses the price actually sold at, i.e. item.price, so it sums to
+  // exactly sale.subtotal — using today's menu price would drift if a
+  // price was changed since this sale happened)
+  const saleCategorySubtotal = {};
+  (sale.items || []).forEach(item => {
+    const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
+    const cat = categoryTotals[meta.category] ? meta.category : "uncategorized";
+    const qty = item.qty || 0;
+    const lineTotal = (item.price || 0) * qty;
+
+    categoryTotals[cat].cups += qty;
+    categoryTotals[cat].revenue += (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
+    categoryTotals[cat].drinks[item.name] = (categoryTotals[cat].drinks[item.name] || 0) + qty;
+
+    saleCategorySubtotal[cat] = (saleCategorySubtotal[cat] || 0) + lineTotal;
+  });
+
+  // === Second pass: spread this sale's discount across categories,
+  // proportional to how much of the sale's subtotal each category made up ===
+  const saleSubtotal = parseFloat(sale.subtotal || 0);
+  const saleDiscount = parseFloat(sale.discountAmount || 0);
+  if (saleSubtotal > 0 && saleDiscount > 0) {
+    Object.entries(saleCategorySubtotal).forEach(([cat, catSubtotal]) => {
+      const share = (catSubtotal / saleSubtotal) * saleDiscount;
+      categoryTotals[cat].discount += share;
     });
+  }
+});
 
     const totalCups = paidCups + freeCups + discountedCups;
 
@@ -255,34 +275,35 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
       <div class="summary-grid">
         <div class="summary-box total">
-          <span class="icon">🥤</span>
+         
           <span class="value">${totalCups}</span>
           <span class="label">Total Transaction</span>
         </div>
         <div class="summary-box paid">
-          <span class="icon">💰</span>
+  
           <span class="value">${paidCups}</span>
           <span class="label">Full-Price</span>
         </div>
         <div class="summary-box discount">
-          <span class="icon">🏷️</span>
+     
           <span class="value">${discountedCups}</span>
           <span class="label">Discounted</span>
           <span class="sub-label">-RM${totalDiscountAmount.toFixed(2)}</span>
         </div>
         <div class="summary-box free">
-          <span class="icon">🎉</span>
+        
           <span class="value">${freeCups}</span>
           <span class="label">Free</span>
           <span class="sub-label">worth RM${totalFreeValue.toFixed(2)}</span>
         </div>
       </div>
-      <div class="category-grid">
+     <div class="category-grid">
         ${["matcha", "coffee", "dessert"].map(cat => `
           <div class="category-box cat-${cat}">
             <span class="cat-badge cat-${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
             <span class="category-cups">${categoryTotals[cat].cups}</span>
-            <span class="category-sub">cups · RM${categoryTotals[cat].revenue.toFixed(2)}</span>
+            <span class="category-sub">RM${categoryTotals[cat].revenue.toFixed(2)}</span>
+            ${categoryTotals[cat].discount > 0 ? `<span class="category-discount">-RM${categoryTotals[cat].discount.toFixed(2)} discount</span>` : ""}
             ${renderCategoryDrinksList(categoryTotals[cat].drinks)}
           </div>
         `).join("")}
@@ -290,7 +311,8 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="category-box cat-uncat">
             <span class="cat-badge cat-uncat">Uncategorized</span>
             <span class="category-cups">${categoryTotals.uncategorized.cups}</span>
-            <span class="category-sub">cups · RM${categoryTotals.uncategorized.revenue.toFixed(2)}</span>
+            <span class="category-sub">RM${categoryTotals.uncategorized.revenue.toFixed(2)}</span>
+            ${categoryTotals.uncategorized.discount > 0 ? `<span class="category-discount">-RM${categoryTotals.uncategorized.discount.toFixed(2)} discount</span>` : ""}
             ${renderCategoryDrinksList(categoryTotals.uncategorized.drinks)}
           </div>
         ` : ""}
@@ -307,16 +329,18 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSummaryForRange(start, end, currentViewMode);
   }
 
-  function setupSummaryDatePicker() {
+ function setupSummaryDatePicker() {
     const datePicker = document.getElementById("summaryDatePicker");
     const todayBtn = document.getElementById("summaryTodayBtn");
+    const prevBtn = document.getElementById("summaryPrevBtn");
+    const nextBtn = document.getElementById("summaryNextBtn");
     const modeButtons = document.querySelectorAll(".view-mode-btn");
     if (!datePicker) return;
 
     const today = new Date();
     const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     datePicker.value = isoToday;
-    datePicker.max = isoToday;
+    datePicker.max = isoToday; // can't pick a future date
 
     datePicker.addEventListener("change", refreshSummary);
 
@@ -324,6 +348,34 @@ document.addEventListener("DOMContentLoaded", () => {
       datePicker.value = isoToday;
       refreshSummary();
     });
+
+    // === Step the picker's date backward/forward by one unit of the
+    // current view mode (1 day / 1 week / 1 month), then re-render ===
+    function shiftRange(direction) {
+      if (!datePicker.value) return;
+      const [y, m, d] = datePicker.value.split("-").map(Number);
+      const refDate = new Date(y, m - 1, d);
+
+      if (currentViewMode === "day") {
+        refDate.setDate(refDate.getDate() + direction);
+      } else if (currentViewMode === "week") {
+        refDate.setDate(refDate.getDate() + direction * 7);
+      } else if (currentViewMode === "month") {
+        refDate.setMonth(refDate.getMonth() + direction);
+      }
+
+      // Don't allow navigating into the future past today
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+      if (refDate > todayMidnight) return;
+
+      const isoStr = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, "0")}-${String(refDate.getDate()).padStart(2, "0")}`;
+      datePicker.value = isoStr;
+      refreshSummary();
+    }
+
+    prevBtn?.addEventListener("click", () => shiftRange(-1));
+    nextBtn?.addEventListener("click", () => shiftRange(1));
 
     modeButtons.forEach(btn => {
       btn.addEventListener("click", () => {

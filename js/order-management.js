@@ -470,9 +470,6 @@ function calculateDiscount(cartItems, discountLabel) {
       case "Free":
       discountAmount = subtotal; // 100% off — whole order becomes RM0.00
       break;
-    case "Buy 2 Get 10% Off":
-      if (totalQty >= 2) discountAmount = subtotal * 0.10;
-      break;
   }
 
   if (discountAmount > subtotal) discountAmount = subtotal;
@@ -570,10 +567,6 @@ discountOptions.forEach(button => {
         if (totalQty < 3)
           return alert("❌ Buy 2 Free 1 requires at least 3 items.");
         appliedDiscount = "Buy 2 Free 1";
-        break;
-      case "buy2get10":
-        if (totalQty < 2) return alert("❌ Buy 2 Get 10% Off requires at least 2 items.");
-        appliedDiscount = "Buy 2 Get 10% Off";
         break;
       case "5off":
         appliedDiscount = "5% Off";
