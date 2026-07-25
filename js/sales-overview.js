@@ -398,21 +398,21 @@ function handleImportFile(e) {
       }
 
       const existingSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
-      const existingIds = new Set(existingSales.map(s => s.id));
+      // Map by ID so we can restore/update in place
+      const salesById = new Map(existingSales.map(s => [s.id, s]));
 
-      let imported = 0;
-      let skipped = 0;
+      let restored = 0;   // ID didn't exist locally (was deleted) -> brought back
+      let updated = 0;    // ID exists locally, date matches -> safe refresh
+      let conflicts = 0;  // ID exists locally, but date differs -> likely ID reused by a different sale, skipped
+      let skippedBlank = 0;
 
       dataRows.forEach(row => {
         if (!row || row.every(cell => cell === "" || cell === undefined)) return;
 
         const id = String(row[idxId] ?? "").trim();
-        if (!id) { skipped++; return; }
+        if (!id) { skippedBlank++; return; }
 
-        if (existingIds.has(id)) {
-          skipped++; // avoid duplicate imports of the same order
-          return;
-        }
+        const importedDate = String(row[idxDate] ?? "").trim();
 
         // Parse "2xMatcha Muse | 1xAmericano" back into item objects
         const itemsRaw = String(row[idxItems] ?? "");
@@ -429,7 +429,7 @@ function handleImportFile(e) {
 
         const sale = {
           id,
-          date: String(row[idxDate] ?? ""),
+          date: importedDate,
           cashier: String(row[idxCashier] ?? ""),
           customer: String(row[idxCustomer] ?? ""),
           items,
@@ -440,13 +440,30 @@ function handleImportFile(e) {
           refundReason: idxRefundReason !== -1 ? String(row[idxRefundReason] ?? "") : ""
         };
 
-        existingSales.push(sale);
-        existingIds.add(id);
-        imported++;
+        const existing = salesById.get(id);
+
+        if (!existing) {
+          // Not on record locally (e.g. it was deleted) -> restore it from the backup
+          salesById.set(id, sale);
+          restored++;
+        } else if (String(existing.date ?? "").trim() === importedDate) {
+          // Same ID, same date -> genuinely the same sale, safe to refresh
+          // Preserve fields the export doesn't carry (subtotal, discountAmount, item prices)
+          salesById.set(id, { ...existing, ...sale });
+          updated++;
+        } else {
+          // Same ID but different date -> this ID was likely reused by a newer sale.
+          // Don't overwrite current data with the old backup record.
+          conflicts++;
+        }
       });
 
-      localStorage.setItem("mintcha_sales", JSON.stringify(existingSales));
-      alert(`✅ Imported ${imported} sale(s). Skipped ${skipped} (duplicate or blank rows).`);
+      localStorage.setItem("mintcha_sales", JSON.stringify(Array.from(salesById.values())));
+      alert(
+        `✅ Restored ${restored} sale(s), updated ${updated} matching sale(s).\n` +
+        (conflicts ? `⚠️ ${conflicts} sale(s) skipped — Order ID exists locally with a different date (likely reused by a newer sale).\n` : "") +
+        (skippedBlank ? `Skipped ${skippedBlank} blank row(s).` : "")
+      );
       location.reload();
     } catch (err) {
       console.error(err);
