@@ -57,6 +57,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (confirm("⚠️ Delete ALL sales data? This cannot be undone.")) {
           localStorage.removeItem("mintcha_sales");
           localStorage.removeItem("mintcha_sales_undo_backup");
+          // Deliberately NOT removing mintcha_order_counter here — the next Order ID
+          // generated after a clear should keep counting up from where it left off,
+          // not reset to ORD-0001 and risk colliding with sales from a previous day.
           alert("✅ Sales cleared.");
           location.reload();
         }
@@ -73,6 +76,26 @@ document.addEventListener("DOMContentLoaded", () => {
       undoBtn.onclick = undoLastImport;
       exportControls.appendChild(undoBtn);
       refreshUndoButtonState();
+
+      // === Review Import Conflicts ===
+      const reviewBtn = document.createElement("button");
+      reviewBtn.id = "reviewConflictsBtn";
+      reviewBtn.className = "admin-btn export-btn";
+      reviewBtn.style.backgroundColor = "#b8860b";
+      reviewBtn.style.color = "#fff";
+      reviewBtn.onclick = openConflictsModal;
+      exportControls.appendChild(reviewBtn);
+      refreshConflictsButtonState();
+
+      // === Fix Corrupted Dates (repairs sales already saved with raw Excel serial numbers) ===
+      const fixDatesBtn = document.createElement("button");
+      fixDatesBtn.id = "fixDatesBtn";
+      fixDatesBtn.textContent = "🛠️ Fix Corrupted Dates";
+      fixDatesBtn.className = "admin-btn export-btn";
+      fixDatesBtn.style.backgroundColor = "#455a64";
+      fixDatesBtn.style.color = "#fff";
+      fixDatesBtn.onclick = fixCorruptedDates;
+      exportControls.appendChild(fixDatesBtn);
 
       // === Add Sale (Manual Entry) — re-key past sales with a custom date/time ===
       const addSaleBtn = document.createElement("button");
@@ -112,6 +135,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Safe Date Parser (Local-Time Aware) ---
   function parseDateSafe(dateString) {
     if (!dateString) return null;
+
+    // 0️⃣ Bare Excel serial number stored as a string/number (e.g. "46333.868...")
+    //    Catches dates that were corrupted by a prior import before this fix existed.
+    const serialGuess = excelSerialToDate(dateString);
+    if (serialGuess) return serialGuess;
 
     // 1️⃣ Try built-in parser first (handles ISO)
     let d = new Date(dateString);
@@ -324,6 +352,36 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPagination();
   };
 
+  // === One-time repair for sales already saved with raw Excel serial-number dates ===
+  function fixCorruptedDates() {
+    const allSales = loadSales();
+    let fixedCount = 0;
+
+    const repaired = allSales.map(sale => {
+      const asDate = excelSerialToDate(sale.date);
+      if (asDate) {
+        fixedCount++;
+        const pad = (n) => String(n).padStart(2, "0");
+        return {
+          ...sale,
+          date: `${pad(asDate.getUTCDate())}/${pad(asDate.getUTCMonth() + 1)}/${asDate.getUTCFullYear()} ${pad(asDate.getUTCHours())}:${pad(asDate.getUTCMinutes())}`
+        };
+      }
+      return sale;
+    });
+
+    if (fixedCount === 0) {
+      alert("✅ No corrupted dates found — nothing to fix.");
+      return;
+    }
+
+    if (!confirm(`Found ${fixedCount} sale(s) with a raw Excel serial number instead of a real date. Fix them now?`)) return;
+
+    localStorage.setItem("mintcha_sales", JSON.stringify(repaired));
+    alert(`✅ Fixed ${fixedCount} sale(s).`);
+    location.reload();
+  }
+
   // === Manual Sale Entry (Admin) ===
   function setupAddSaleModal() {
     const modal = document.getElementById("addSaleModal");
@@ -396,13 +454,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function generateNextOrderId() {
-    const allSales = loadSales();
-    let maxNum = 0;
-    allSales.forEach(s => {
-      const m = String(s.id || "").match(/^ORD-(\d+)$/);
-      if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
-    });
-    return `ORD-${String(maxNum + 1).padStart(4, "0")}`;
+    return `ORD-${String(getNextOrderNumber()).padStart(4, "0")}`;
   }
 
   function saveManualSale() {
@@ -459,6 +511,96 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// === Persistent Order ID counter ===
+// Stored under its own key so "Clear All Sales" (which only removes
+// mintcha_sales / mintcha_sales_undo_backup) never resets it. This is what
+// stops a fresh testing day from generating a brand-new ORD-0001 that
+// collides with an ID already used on a previous day.
+const ORDER_COUNTER_KEY = "mintcha_order_counter";
+
+function getNextOrderNumber() {
+  const stored = parseInt(localStorage.getItem(ORDER_COUNTER_KEY) || "0", 10);
+
+  // Safety net for the very first run on a browser that already has sales
+  // but has never set this counter before — don't let it dip below what's
+  // already sitting in mintcha_sales.
+  let maxFromSales = 0;
+  try {
+    const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+    allSales.forEach(s => {
+      const m = String(s.id || "").match(/^ORD-(\d+)$/);
+      if (m) maxFromSales = Math.max(maxFromSales, parseInt(m[1], 10));
+    });
+  } catch (err) { /* ignore */ }
+
+  const next = Math.max(stored, maxFromSales) + 1;
+  localStorage.setItem(ORDER_COUNTER_KEY, String(next));
+  return next;
+}
+
+// Called after import/repair so the counter never falls behind IDs that
+// arrived from a file (e.g. a backup with higher order numbers than
+// anything currently stored locally).
+function ensureOrderCounterAtLeast(maxNum) {
+  const current = parseInt(localStorage.getItem(ORDER_COUNTER_KEY) || "0", 10);
+  if (maxNum > current) {
+    localStorage.setItem(ORDER_COUNTER_KEY, String(maxNum));
+  }
+}
+
+// === Excel serial date helper (shared by import + display + one-time repair) ===
+// Converts a raw Excel date serial number (e.g. 46333.868055555555, meaning
+// "days since Dec 30 1899, plus a fractional day for the time") into a JS Date (UTC).
+// Returns null if the value isn't a plausible serial number.
+function excelSerialToDate(value) {
+  const num = typeof value === "number" ? value : parseFloat(value);
+  if (isNaN(num)) return null;
+  // Guard rails: real serials for "recent-ish" dates roughly fall in this range
+  // (~1954 to ~2064). This avoids misreading small numbers like "5" or "2026" as dates.
+  if (num < 20000 || num > 60000) return null;
+  // Also require it to actually look like a serial (has the full string of the original
+  // number, not just something that happens to parse as a float in range) —
+  // calling code already restricts this to the "date" column, so this check is enough.
+
+  const utcDays = Math.floor(num - 25569); // 25569 = days between 1899-12-30 and 1970-01-01
+  const utcMs = utcDays * 86400 * 1000;
+  const dateInfo = new Date(utcMs);
+
+  const fractionalDay = num - Math.floor(num) + 0.0000001;
+  let totalSeconds = Math.floor(86400 * fractionalDay);
+  const seconds = totalSeconds % 60;
+  totalSeconds -= seconds;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+
+  const d = new Date(Date.UTC(
+    dateInfo.getUTCFullYear(),
+    dateInfo.getUTCMonth(),
+    dateInfo.getUTCDate(),
+    hours,
+    minutes,
+    seconds
+  ));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Formats any stored date value (real date string, ISO string, or a corrupted
+// raw Excel serial number) into a friendly DD/MM/YYYY HH:MM string for display.
+function formatSaleDateForDisplay(value) {
+  if (!value) return "-";
+  const asSerial = excelSerialToDate(value);
+  if (asSerial) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(asSerial.getUTCDate())}/${pad(asSerial.getUTCMonth() + 1)}/${asSerial.getUTCFullYear()} ${pad(asSerial.getUTCHours())}:${pad(asSerial.getUTCMinutes())}`;
+  }
+  const d = new Date(value);
+  if (!isNaN(d.getTime())) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  return String(value);
+}
+
 // === CSV Export Function ===
 function exportToCSV() {
   const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
@@ -468,10 +610,7 @@ function exportToCSV() {
 
   sales.forEach(s => {
     const itemStr = (s.items || []).map(i => `${i.qty}x${i.name}`).join(" | ");
-    const d = new Date(s.date);
-    const formattedDate = isNaN(d)
-      ? s.date
-      : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const formattedDate = formatSaleDateForDisplay(s.date);
 
     rows.push([
       s.id,
@@ -546,6 +685,143 @@ function refreshUndoButtonState() {
   btn.style.cursor = hasBackup ? "pointer" : "not-allowed";
 }
 
+// === Review Import Conflicts ===
+function loadConflicts() {
+  try {
+    return JSON.parse(localStorage.getItem("mintcha_sales_import_conflicts") || "[]");
+  } catch (err) {
+    return [];
+  }
+}
+
+function saveConflicts(conflicts) {
+  if (conflicts.length) {
+    localStorage.setItem("mintcha_sales_import_conflicts", JSON.stringify(conflicts));
+  } else {
+    localStorage.removeItem("mintcha_sales_import_conflicts");
+  }
+  refreshConflictsButtonState();
+}
+
+function refreshConflictsButtonState() {
+  const btn = document.getElementById("reviewConflictsBtn");
+  if (!btn) return;
+  const count = loadConflicts().length;
+  btn.textContent = `⚠️ Review Conflicts (${count})`;
+  btn.disabled = count === 0;
+  btn.style.opacity = count ? "1" : "0.5";
+  btn.style.cursor = count ? "pointer" : "not-allowed";
+}
+
+function renderConflictsTable() {
+  const conflicts = loadConflicts();
+  const tbody = document.getElementById("conflictsTableBody");
+  const countLabel = document.getElementById("conflictsCount");
+  if (countLabel) countLabel.textContent = conflicts.length;
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!conflicts.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No conflicts to review 🎉</td></tr>`;
+    return;
+  }
+
+  conflicts.forEach(c => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${c.id}</td>
+      <td>${formatSaleDateForDisplay(c.local.date)}<br><small>RM${parseFloat(c.local.total || 0).toFixed(2)}</small></td>
+      <td>${formatSaleDateForDisplay(c.imported.date)}<br><small>RM${parseFloat(c.imported.total || 0).toFixed(2)}</small></td>
+    `;
+
+    const actionCell = document.createElement("td");
+    actionCell.className = "conflict-actions";
+
+    const keepBtn = document.createElement("button");
+    keepBtn.textContent = "Keep Local";
+    keepBtn.className = "admin-btn";
+    keepBtn.onclick = () => resolveConflict(c.id, "keepLocal");
+
+    const useImportedBtn = document.createElement("button");
+    useImportedBtn.textContent = "Use Imported";
+    useImportedBtn.className = "admin-btn export-btn";
+    useImportedBtn.onclick = () => resolveConflict(c.id, "useImported");
+
+    actionCell.appendChild(keepBtn);
+    actionCell.appendChild(useImportedBtn);
+    row.appendChild(actionCell);
+
+    tbody.appendChild(row);
+  });
+}
+
+function resolveConflict(id, action) {
+  const conflicts = loadConflicts();
+  const target = conflicts.find(c => c.id === id);
+  if (!target) return;
+
+  if (action === "useImported") {
+    const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+    const idx = allSales.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      allSales[idx] = { ...allSales[idx], ...target.imported };
+    } else {
+      allSales.push(target.imported);
+    }
+    localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
+  }
+  // "keepLocal" just dismisses the conflict without touching mintcha_sales
+
+  const remaining = conflicts.filter(c => c.id !== id);
+  saveConflicts(remaining);
+  renderConflictsTable();
+
+  if (window.applyFilters) window.applyFilters();
+}
+
+function resolveAllConflicts(action) {
+  const conflicts = loadConflicts();
+  if (!conflicts.length) return;
+
+  const label = action === "useImported" ? "use the IMPORTED version for" : "keep the LOCAL version for";
+  if (!confirm(`This will ${label} all ${conflicts.length} remaining conflicts. Continue?`)) return;
+
+  if (action === "useImported") {
+    const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+    const byId = new Map(allSales.map(s => [s.id, s]));
+    conflicts.forEach(c => {
+      byId.set(c.id, { ...(byId.get(c.id) || {}), ...c.imported });
+    });
+    localStorage.setItem("mintcha_sales", JSON.stringify(Array.from(byId.values())));
+  }
+
+  saveConflicts([]);
+  renderConflictsTable();
+  if (window.applyFilters) window.applyFilters();
+}
+
+function openConflictsModal() {
+  const modal = document.getElementById("conflictsModal");
+  if (!modal) return;
+
+  if (!modal.dataset.wired) {
+    modal.dataset.wired = "true";
+    document.getElementById("closeConflictsModal").onclick = closeConflictsModal;
+    document.getElementById("useImportedAllBtn").onclick = () => resolveAllConflicts("useImported");
+    document.getElementById("keepLocalAllBtn").onclick = () => resolveAllConflicts("keepLocal");
+  }
+
+  renderConflictsTable();
+  modal.classList.remove("hidden");
+  modal.classList.add("is-open");
+}
+
+function closeConflictsModal() {
+  const modal = document.getElementById("conflictsModal");
+  modal.classList.add("hidden");
+  modal.classList.remove("is-open");
+}
+
 // === Import Sales from XLSX ===
 function handleImportFile(e) {
   const file = e.target.files[0];
@@ -555,7 +831,9 @@ function handleImportFile(e) {
   reader.onload = (evt) => {
     try {
       const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
+      // cellDates:true makes Excel's native date/time cells come back as real JS Date
+      // objects instead of raw serial numbers, so we can format them correctly below.
+      const workbook = XLSX.read(data, { type: "array", cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       // header:1 gives raw rows so we control the column mapping ourselves
@@ -571,7 +849,9 @@ function handleImportFile(e) {
       const headerRow = rows[0].map(h => String(h).trim().toLowerCase());
       const dataRows = rows.slice(1);
 
-      const col = (name) => headerRow.indexOf(name);
+      // Substring match instead of exact match — tolerates headers like "Order Date",
+      // "Date/Time", trailing punctuation, etc. instead of requiring the literal word.
+      const col = (name) => headerRow.findIndex(h => h.includes(name));
       const idxId = col("order id");
       const idxDate = col("date");
       const idxCashier = col("cashier");
@@ -588,6 +868,35 @@ function handleImportFile(e) {
         return;
       }
 
+      if (idxDate === -1) {
+        const proceed = confirm(
+          "⚠️ Couldn't find a 'Date' column in this file — every imported sale would end up with a blank date.\n\n" +
+          "Check that your Date column header contains the word \"date\".\n\n" +
+          "Continue importing anyway (dates will be blank)?"
+        );
+        if (!proceed) return;
+      }
+
+      // Converts a raw imported cell value into the same date-string format used elsewhere.
+      // Handles: real Date objects (from Excel-formatted date cells), bare Excel serial
+      // numbers (from cells stored as plain numbers, no date format applied), and plain
+      // text/ISO strings.
+      function excelValueToDateString(value) {
+        if (value instanceof Date && !isNaN(value.getTime())) {
+          const pad = (n) => String(n).padStart(2, "0");
+          return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+        }
+
+        // Fallback: bare Excel serial number (cell wasn't formatted as a date in the source file)
+        const asSerial = excelSerialToDate(value);
+        if (asSerial) {
+          const pad = (n) => String(n).padStart(2, "0");
+          return `${pad(asSerial.getUTCDate())}/${pad(asSerial.getUTCMonth() + 1)}/${asSerial.getUTCFullYear()} ${pad(asSerial.getUTCHours())}:${pad(asSerial.getUTCMinutes())}`;
+        }
+
+        return String(value ?? "").trim();
+      }
+
       const existingSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
 
       // Snapshot current data BEFORE applying the import, so it can be undone.
@@ -602,16 +911,28 @@ function handleImportFile(e) {
 
       let restored = 0;   // ID didn't exist locally (was deleted) -> brought back
       let updated = 0;    // ID exists locally, date matches -> safe refresh
-      let conflicts = 0;  // ID exists locally, but date differs -> likely ID reused by a different sale, skipped
+      const conflictRecords = []; // ID exists locally, but date differs -> needs manual review
       let skippedBlank = 0;
 
+      // --- Pass 1: parse every row into a sale object first (don't merge yet). ---
+      // We need to see the WHOLE file before merging, because the same Order ID can appear
+      // more than once in a single export (e.g. IDs got reused after a "Clear All Sales" on a
+      // different day). If we merged row-by-row, later rows would silently overwrite earlier
+      // ones with the same ID before we ever got a chance to notice the collision.
+      const parsedRows = [];
       dataRows.forEach(row => {
         if (!row || row.every(cell => cell === "" || cell === undefined)) return;
 
         const id = String(row[idxId] ?? "").trim();
         if (!id) { skippedBlank++; return; }
 
-        const importedDate = String(row[idxDate] ?? "").trim();
+        const rawDateValue = idxDate !== -1 ? row[idxDate] : "";
+        const importedDate = idxDate !== -1 ? excelValueToDateString(rawDateValue) : "";
+        // Keep a real Date around (when we have one) purely so duplicate rows for the
+        // same ID can be sorted chronologically in Pass 2 below.
+        const sortDate = (rawDateValue instanceof Date && !isNaN(rawDateValue.getTime()))
+          ? rawDateValue
+          : (excelSerialToDate(rawDateValue) || new Date(importedDate) || null);
 
         // Parse "2xMatcha Muse | 1xAmericano" back into item objects
         const itemsRaw = String(row[idxItems] ?? "");
@@ -626,41 +947,128 @@ function handleImportFile(e) {
               : { qty: 1, name: part, price: 0 };
           });
 
-        const sale = {
-          id,
-          date: importedDate,
-          cashier: String(row[idxCashier] ?? ""),
-          customer: String(row[idxCustomer] ?? ""),
-          items,
-          total: parseFloat(row[idxTotal]) || 0,
-          paymentMethod: String(row[idxPayment] ?? ""),
-          discountType: String(row[idxDiscount] ?? "None"),
-          status: String(row[idxStatus] ?? ""),
-          refundReason: idxRefundReason !== -1 ? String(row[idxRefundReason] ?? "") : ""
-        };
+        parsedRows.push({
+          _sortDate: sortDate,
+          sale: {
+            id,
+            date: importedDate,
+            cashier: String(row[idxCashier] ?? ""),
+            customer: String(row[idxCustomer] ?? ""),
+            items,
+            total: parseFloat(row[idxTotal]) || 0,
+            paymentMethod: String(row[idxPayment] ?? ""),
+            discountType: String(row[idxDiscount] ?? "None"),
+            status: String(row[idxStatus] ?? ""),
+            refundReason: idxRefundReason !== -1 ? String(row[idxRefundReason] ?? "") : ""
+          }
+        });
+      });
 
-        const existing = salesById.get(id);
+      // --- Pass 2: find Order IDs that appear more than once in THIS file, and rename ---
+      // every occurrence after the first (oldest kept as the original ID) so no sale gets
+      // silently dropped just because a previous testing day already used that same ID.
+      const groupsById = new Map();
+      parsedRows.forEach(entry => {
+        if (!groupsById.has(entry.sale.id)) groupsById.set(entry.sale.id, []);
+        groupsById.get(entry.sale.id).push(entry);
+      });
+
+      const usedIds = new Set(existingSales.map(s => s.id));
+      let renamedCount = 0;
+      const duplicateIdsFound = [];
+
+      const finalSales = [];
+      groupsById.forEach((group, originalId) => {
+        if (group.length === 1) {
+          usedIds.add(originalId);
+          finalSales.push(group[0].sale);
+          return;
+        }
+
+        duplicateIdsFound.push(originalId);
+
+        // Oldest first, so the earliest sale keeps the "real" ID and matches normally
+        // against whatever's already stored locally under that ID.
+        group.sort((a, b) => {
+          const ta = a._sortDate ? a._sortDate.getTime() : 0;
+          const tb = b._sortDate ? b._sortDate.getTime() : 0;
+          return ta - tb;
+        });
+
+        group.forEach((entry, i) => {
+          if (i === 0) {
+            usedIds.add(originalId);
+            finalSales.push(entry.sale);
+            return;
+          }
+          // Every later occurrence of this reused ID becomes its own distinct sale
+          // instead of overwriting/being overwritten by the others.
+          let n = 2;
+          let candidate = `${originalId}-b${n}`;
+          while (usedIds.has(candidate)) {
+            n++;
+            candidate = `${originalId}-b${n}`;
+          }
+          usedIds.add(candidate);
+          renamedCount++;
+          finalSales.push({ ...entry.sale, id: candidate });
+        });
+      });
+
+      // --- Pass 3: merge the (now-unique) parsed sales into local storage as before ---
+      finalSales.forEach(sale => {
+        const existing = salesById.get(sale.id);
 
         if (!existing) {
           // Not on record locally (e.g. it was deleted) -> restore it from the backup
-          salesById.set(id, sale);
+          salesById.set(sale.id, sale);
           restored++;
-        } else if (String(existing.date ?? "").trim() === importedDate) {
+        } else if (String(existing.date ?? "").trim() === sale.date) {
           // Same ID, same date -> genuinely the same sale, safe to refresh
           // Preserve fields the export doesn't carry (subtotal, discountAmount, item prices)
-          salesById.set(id, { ...existing, ...sale });
+          salesById.set(sale.id, { ...existing, ...sale });
           updated++;
         } else {
-          // Same ID but different date -> this ID was likely reused by a newer sale.
-          // Don't overwrite current data with the old backup record.
-          conflicts++;
+          // Same ID but different date -> could mean this ID was reused by a newer sale,
+          // OR it could mean the local copy is the one that's wrong (e.g. corrupted by an
+          // earlier bad import). We can't tell which, so don't guess — leave local data as-is
+          // and record it for manual review instead of silently dropping it.
+          conflictRecords.push({ id: sale.id, local: existing, imported: sale });
         }
       });
 
       localStorage.setItem("mintcha_sales", JSON.stringify(Array.from(salesById.values())));
+
+      // Make sure future manually-entered Order IDs never collide with the highest
+      // number that just came in from this file.
+      let maxNumSeen = 0;
+      salesById.forEach((s) => {
+        const m = String(s.id || "").match(/^ORD-(\d+)/);
+        if (m) maxNumSeen = Math.max(maxNumSeen, parseInt(m[1], 10));
+      });
+      ensureOrderCounterAtLeast(maxNumSeen);
+
+      // Merge with any conflicts already pending review from a previous import
+      const priorConflictsRaw = localStorage.getItem("mintcha_sales_import_conflicts");
+      let allConflicts = conflictRecords;
+      if (priorConflictsRaw) {
+        try {
+          const prior = JSON.parse(priorConflictsRaw);
+          const seen = new Set(conflictRecords.map(c => c.id));
+          allConflicts = [...prior.filter(c => !seen.has(c.id)), ...conflictRecords];
+        } catch (err) { /* ignore corrupted prior conflicts */ }
+      }
+
+      if (allConflicts.length) {
+        localStorage.setItem("mintcha_sales_import_conflicts", JSON.stringify(allConflicts));
+      } else {
+        localStorage.removeItem("mintcha_sales_import_conflicts");
+      }
+
       alert(
         `✅ Restored ${restored} sale(s), updated ${updated} matching sale(s).\n` +
-        (conflicts ? `⚠️ ${conflicts} sale(s) skipped — Order ID exists locally with a different date (likely reused by a newer sale).\n` : "") +
+        (renamedCount ? `🔀 ${renamedCount} sale(s) reused an Order ID from a different day (${duplicateIdsFound.slice(0, 5).join(", ")}${duplicateIdsFound.length > 5 ? ", ..." : ""}) — auto-renamed with a "-b" suffix so none were lost.\n` : "") +
+        (allConflicts.length ? `⚠️ ${allConflicts.length} sale(s) need review — Order ID exists locally with a different date.\nClick "⚠️ Review Conflicts" to compare and resolve them.\n` : "") +
         (skippedBlank ? `Skipped ${skippedBlank} blank row(s).\n` : "") +
         `If this wasn't the file you meant to import, click "↩️ Undo Last Import" to revert.`
       );
@@ -696,7 +1104,7 @@ function viewReceipt(saleId) {
     <span id="closeReceiptModal" class="close">&times;</span>
     <div class="receipt-brand">🍃 Mintcha</div>
     <div class="receipt-header">
-      <div><strong>${sale.date}</strong></div>
+      <div><strong>${formatSaleDateForDisplay(sale.date)}</strong></div>
       <div>Order ID: ${sale.id}</div>
       <div>Cashier: ${sale.cashier || "-"}</div>
       <div>Customer: ${sale.customer || "-"}</div>
@@ -717,9 +1125,13 @@ function viewReceipt(saleId) {
     </div>
   `;
 
-  receiptModal.style.display = "flex";
+  receiptModal.classList.remove("hidden");
+  receiptModal.classList.add("is-open");
 
-  const closeModal = () => (receiptModal.style.display = "none");
+  const closeModal = () => {
+    receiptModal.classList.add("hidden");
+    receiptModal.classList.remove("is-open");
+  };
   document.getElementById("closeReceiptModalBtn").onclick = closeModal;
   document.getElementById("closeReceiptModal").onclick = closeModal;
 }

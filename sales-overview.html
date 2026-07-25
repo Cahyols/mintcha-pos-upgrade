@@ -122,7 +122,34 @@
     
   </div>
 
-  <!-- === Manual Sale Entry Modal (Admin only) — for re-keying past sales with a custom date/time === -->
+  <!-- === Import Conflicts Review Modal (Admin only) === -->
+  <div id="conflictsModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeConflictsModal" class="close">&times;</span>
+      <h2>⚠️ Review Import Conflicts</h2>
+      <p>These Order IDs exist in both your current data and the imported file, but with a different date. Compare each and choose which version to keep.</p>
+
+      <div class="modal-actions" style="margin-bottom:10px;">
+        <button id="useImportedAllBtn" class="admin-btn export-btn">Use Imported for All</button>
+        <button id="keepLocalAllBtn" class="admin-btn">Keep Local for All</button>
+      </div>
+
+      <div class="sales-table-wrapper">
+        <table class="sales-table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Local (current) — Date / Total</th>
+              <th>Imported (file) — Date / Total</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="conflictsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div id="addSaleModal" class="modal hidden">
     <div class="modal-content">
       <span id="closeAddSaleModal" class="close">&times;</span>

@@ -983,3 +983,118 @@ body.sidebar-open {
 .delete-drink-btn:hover {
   background-color: #c0392b;
 }
+
+/* ============================================================
+   MODAL FIX — append to the very end of css/style.css
+   ============================================================
+   Root cause: .modal-content is hardcoded to width:300px with
+   margin:10% auto (set across your Discount/Payment modal blocks).
+   That's fine for small dialogs, but the conflicts table and the
+   add-sale form don't fit in 300px, so they overflow the box —
+   that's the "stretched/overlapping list" look in the screenshot.
+
+   Fix: neutralize the stray margin (flex centering on .modal
+   already handles positioning), and give the two content-heavy
+   modals their own wider size. Small modals (discount/payment/
+   receipt) are untouched and keep their existing 300px look.
+   ============================================================ */
+
+.modal-content {
+  margin: 0; /* was 10% auto — conflicts with the flex centering already on .modal */
+}
+
+.modal.is-open {
+  display: flex; /* matches the updated sales-overview.js, which toggles this class */
+}
+
+/* ---- Conflicts review modal: needs room for a real table ---- */
+#conflictsModal .modal-content {
+  width: min(92vw, 820px);
+  max-width: 820px;
+  max-height: 85vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+#conflictsModal p {
+  color: #555;
+  margin: 8px 0 16px;
+}
+
+/* Sticky bulk-action bar so "Use Imported for All" / "Keep Local for All"
+   stay visible while scrolling a long conflicts list instead of getting
+   lost below the fold. */
+#conflictsModal .modal-actions {
+  position: sticky;
+  top: -20px;              /* offsets modal-content's own padding */
+  background: #fff;
+  padding: 12px 0 14px;
+  margin: -20px 0 12px;
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid #eee;
+  z-index: 2;
+}
+
+#conflictsModal .sales-table th {
+  position: sticky;
+  top: 46px;               /* sits just under the sticky action bar */
+  z-index: 1;
+}
+
+#conflictsModal .conflict-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+#conflictsModal .conflict-actions .admin-btn {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* ---- Add Sale modal: needs room for a real form, not a 4-line dialog ---- */
+#addSaleModal .modal-content {
+  width: min(92vw, 560px);
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+#addSaleModal label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 0.9rem;
+}
+
+#addSaleModal input,
+#addSaleModal select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#addSaleModal .sale-item-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+#addSaleModal .sale-item-row .item-qty {
+  width: 60px;
+  flex: none;
+}
+
+#addSaleModal .sale-item-row .item-price {
+  width: 100px;
+  flex: none;
+}
+
+#addSaleModal .modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
