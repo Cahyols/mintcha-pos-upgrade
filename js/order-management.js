@@ -387,8 +387,8 @@ function renderPriceEditorIfAdmin() {
   if (role !== "admin") return;
 
   priceControls.innerHTML = `
-    <button id="toggleEditPrices" class="edit-btn">🖊️ Edit Menu</button>
-    <button id="toggleReorder" class="edit-btn">🔀 Reorder Menu</button>
+    <button id="toggleEditPrices" class="admin-mode-tab">🖊️ Edit Menu</button>
+    <button id="toggleReorder" class="admin-mode-tab">🔀 Reorder Menu</button>
   `;
 
   let currentMode = "view";

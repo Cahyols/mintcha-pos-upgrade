@@ -13,7 +13,7 @@
        admin yellow #fbc02d) rather than introducing new colors.
        ========================================================= */
 
-    #priceControls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    #priceControls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .admin-tools-label {
       font-size: .75rem;
       font-weight: 700;
@@ -22,6 +22,41 @@
       color: #777;
       margin-right: 2px;
     }
+
+    /* Edit Menu / Reorder Menu now sit in the same row as the Dine In /
+       Delivery tabs and share their pill art style (light border/bg,
+       teal fill + white text once active), instead of the old standalone
+       yellow admin buttons. */
+    .menu-toolbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .admin-mode-tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1.5px solid #ddd;
+      background: #fafafa;
+      color: #555;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .admin-mode-tab:hover { border-color: #00897b; color: #00796b; }
+    .admin-mode-tab.active-mode {
+      background: #00897b;
+      border-color: #00897b;
+      color: #fff;
+    }
+    .admin-mode-tab:disabled { opacity: .5; cursor: not-allowed; }
 
     /* === Minimalist panel sizing ===
        style.css's .menu-panel/.cart-panel are shared with other pages, so
@@ -37,10 +72,10 @@
        reads better with more room for the menu grid than the cart form. */
     .menu-panel { flex: 3; }
     .cart-panel { flex: 2; }
-    .menu-panel-header h2,
+    .menu-title,
     .cart-panel > h2 {
       font-size: 1.15rem;
-      margin-bottom: 0;
+      margin-bottom: 12px;
     }
     .cart-panel > h2 {
       margin-bottom: 4px;
@@ -57,13 +92,13 @@
     }
 
     /* === Order type tabs (Dine In / Delivery) === */
-    /* A horizontal row above the category tabs/grid. Selecting one still
-       shows every category — it only changes which price is shown/charged,
-       since dine-in and delivery prices differ. */
+    /* Now lives inside .menu-toolbar-row alongside Edit Menu/Reorder Menu,
+       so its own bottom margin is handled by the row instead. Selecting a
+       type still shows every category — it only changes which price is
+       shown/charged, since dine-in and delivery prices differ. */
     .order-type-tabs {
       display: flex;
       gap: 8px;
-      margin-bottom: 14px;
     }
     .order-type-tab {
       display: flex;
@@ -169,14 +204,6 @@
   align-items: center;
   justify-content: center;
 }
-    /* Existing .edit-btn is yellow site-wide for "admin editing" — keep that,
-       just make the active/pressed state unmistakable. */
-    .edit-btn.active-mode {
-      background-color: #f57f17;
-      box-shadow: inset 0 0 0 2px #333;
-    }
-    .edit-btn:disabled { opacity: .5; cursor: not-allowed; }
-
     /* === Drag & drop reorder states === */
     .menu-item.draggable-item { cursor: grab; }
     .menu-item.draggable-item:active { cursor: grabbing; }
@@ -304,24 +331,16 @@
        in style.css (only .empty-menu was) — filling that gap here. */
     .empty-state { text-align: center; padding: 20px; color: #888; font-style: italic; }
 
-    .menu-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.menu-panel-header h2 { margin: 0; }
-
     @media (prefers-reduced-motion: reduce) {
       .menu-item, .toast { transition: none !important; animation: none !important; }
     }
 
-    /* Stack the category sidebar above the grid, and let order type tabs
-       fill the width, on narrow screens */
+    /* Stack the toolbar row and the category sidebar, and let order type
+       tabs fill the width, on narrow screens */
     @media (max-width: 700px) {
-      .order-type-tab { flex: 1 1 0; padding: 10px 6px; }
+      .menu-toolbar-row { flex-direction: column; align-items: stretch; }
+      .order-type-tabs, #priceControls { width: 100%; }
+      .order-type-tab, .admin-mode-tab { flex: 1 1 0; padding: 10px 6px; }
       .menu-body-layout { flex-direction: column; }
       .menu-cat-tabs { flex-direction: row; flex: 0 0 auto; width: 100%; flex-wrap: wrap; }
     }
@@ -367,20 +386,22 @@
       <div class="order-container">
        <!-- Menu Section -->
         <div class="menu-panel">
-          <div class="menu-panel-header">
-            <h2>Menu</h2>
-            <div id="priceControls"></div>
-          </div>
+          <h2 class="menu-title">Menu</h2>
 
           <!-- Order type: Dine In / Delivery. Each still shows all
-               categories — it only changes which price is used. -->
-          <div class="order-type-tabs" id="orderTypeTabs">
-            <button class="order-type-tab active" data-ordertype="dineIn">
-              <span class="order-type-icon">🍽️</span>Dine In
-            </button>
-            <button class="order-type-tab" data-ordertype="delivery">
-              <span class="order-type-icon">🛵</span>Delivery
-            </button>
+               categories — it only changes which price is used.
+               Edit Menu / Reorder Menu now line up on the same row and
+               share the tab pill styling. -->
+          <div class="menu-toolbar-row">
+            <div class="order-type-tabs" id="orderTypeTabs">
+              <button class="order-type-tab active" data-ordertype="dineIn">
+                <span class="order-type-icon">🍽️</span>Dine In
+              </button>
+              <button class="order-type-tab" data-ordertype="delivery">
+                <span class="order-type-icon">🛵</span>Delivery
+              </button>
+            </div>
+            <div id="priceControls"></div>
           </div>
 
           <div class="menu-body-layout">
