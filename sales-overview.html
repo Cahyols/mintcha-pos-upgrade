@@ -80,8 +80,11 @@
   </div>
 </div>
 
-      <!-- === Export Buttons for Admin === -->
+      <!-- === Export / Import Buttons for Admin === -->
       <div id="exportControls" class="admin-controls"></div>
+
+      <!-- Hidden input used by the Import button -->
+      <input type="file" id="importSalesInput" accept=".xlsx,.xls" style="display:none" />
 
       <!-- === Sales Table === -->
       <div class="sales-table-wrapper">
@@ -120,6 +123,7 @@
   </div>
 
   <!-- === Scripts === -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="js/common.js"></script>
   <script src="js/sales-overview.js"></script>
   

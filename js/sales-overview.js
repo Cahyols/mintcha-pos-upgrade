@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const cashierDisplay = document.getElementById("currentCashier");
   if (cashierDisplay) cashierDisplay.textContent = user;
 
-  // Admin Export Buttons
+  // Admin Export / Import Buttons
   if (role === "admin") {
     const exportControls = document.getElementById("exportControls");
 
@@ -34,6 +34,19 @@ document.addEventListener("DOMContentLoaded", () => {
       exportCSVBtn.className = "admin-btn export-btn";
       exportCSVBtn.onclick = exportToCSV;
       exportControls.appendChild(exportCSVBtn);
+
+      // === Import Sales (XLSX) ===
+      const importBtn = document.createElement("button");
+      importBtn.textContent = "📥 Import Sales (XLSX)";
+      importBtn.className = "admin-btn export-btn";
+      importBtn.onclick = () => document.getElementById("importSalesInput").click();
+      exportControls.appendChild(importBtn);
+
+      const importInput = document.getElementById("importSalesInput");
+      if (importInput) {
+        importInput.value = ""; // reset so re-selecting the same file still fires "change"
+        importInput.onchange = handleImportFile;
+      }
 
       const clearBtn = document.createElement("button");
       clearBtn.textContent = "🗑️ Clear All Sales";
@@ -340,6 +353,110 @@ function exportSalesToJSON() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+// === Import Sales from XLSX ===
+function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      // header:1 gives raw rows so we control the column mapping ourselves
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+      if (!rows.length) {
+        alert("The file is empty.");
+        return;
+      }
+
+      // Expect the same column order as exportToCSV():
+      // Order ID, Date, Cashier, Customer, Items, Total, Payment, Discount, Status, Refund Reason
+      const headerRow = rows[0].map(h => String(h).trim().toLowerCase());
+      const dataRows = rows.slice(1);
+
+      const col = (name) => headerRow.indexOf(name);
+      const idxId = col("order id");
+      const idxDate = col("date");
+      const idxCashier = col("cashier");
+      const idxCustomer = col("customer");
+      const idxItems = col("items");
+      const idxTotal = col("total");
+      const idxPayment = col("payment");
+      const idxDiscount = col("discount");
+      const idxStatus = col("status");
+      const idxRefundReason = col("refund reason");
+
+      if (idxId === -1 || idxTotal === -1) {
+        alert("This file doesn't match the expected Sales export format (missing 'Order ID' / 'Total' columns).");
+        return;
+      }
+
+      const existingSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+      const existingIds = new Set(existingSales.map(s => s.id));
+
+      let imported = 0;
+      let skipped = 0;
+
+      dataRows.forEach(row => {
+        if (!row || row.every(cell => cell === "" || cell === undefined)) return;
+
+        const id = String(row[idxId] ?? "").trim();
+        if (!id) { skipped++; return; }
+
+        if (existingIds.has(id)) {
+          skipped++; // avoid duplicate imports of the same order
+          return;
+        }
+
+        // Parse "2xMatcha Muse | 1xAmericano" back into item objects
+        const itemsRaw = String(row[idxItems] ?? "");
+        const items = itemsRaw
+          .split("|")
+          .map(s => s.trim())
+          .filter(Boolean)
+          .map(part => {
+            const m = part.match(/^(\d+)\s*x\s*(.+)$/i);
+            return m
+              ? { qty: parseInt(m[1], 10), name: m[2].trim(), price: 0 }
+              : { qty: 1, name: part, price: 0 };
+          });
+
+        const sale = {
+          id,
+          date: String(row[idxDate] ?? ""),
+          cashier: String(row[idxCashier] ?? ""),
+          customer: String(row[idxCustomer] ?? ""),
+          items,
+          total: parseFloat(row[idxTotal]) || 0,
+          paymentMethod: String(row[idxPayment] ?? ""),
+          discountType: String(row[idxDiscount] ?? "None"),
+          status: String(row[idxStatus] ?? ""),
+          refundReason: idxRefundReason !== -1 ? String(row[idxRefundReason] ?? "") : ""
+        };
+
+        existingSales.push(sale);
+        existingIds.add(id);
+        imported++;
+      });
+
+      localStorage.setItem("mintcha_sales", JSON.stringify(existingSales));
+      alert(`✅ Imported ${imported} sale(s). Skipped ${skipped} (duplicate or blank rows).`);
+      location.reload();
+    } catch (err) {
+      console.error(err);
+      alert("❌ Failed to read the file. Make sure it's a valid .xlsx file.");
+    } finally {
+      e.target.value = ""; // allow re-selecting same file later
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
 }
 
 function viewReceipt(saleId) {
