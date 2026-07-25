@@ -22,29 +22,78 @@
       color: #777;
       margin-right: 2px;
     }
-    /* === Category filter tabs (same visual language as Menu Recipes) === */
-    .menu-cat-tabs {
+
+    /* === Menu body layout: category sidebar on the left, grid on the
+       right. Order type tabs sit above this whole row. === */
+    .menu-body-layout {
       display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
+      gap: 16px;
+      align-items: flex-start;
     }
-    .menu-cat-tab {
-      border: 1px solid #ddd;
+
+    /* === Order type tabs (Dine In / Delivery) === */
+    /* A horizontal row above the category tabs/grid. Selecting one still
+       shows every category — it only changes which price is shown/charged,
+       since dine-in and delivery prices differ. */
+    .order-type-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .order-type-tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1.5px solid #ddd;
       background: #fafafa;
       color: #555;
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
       cursor: pointer;
       transition: background .12s ease, border-color .12s ease, color .12s ease;
     }
-    .menu-cat-tab:hover { border-color: #00897b; color: #00796b; }
-    .menu-cat-tab.active {
+    .order-type-tab .order-type-icon { font-size: 1.1rem; line-height: 1; }
+    .order-type-tab:hover { border-color: #00897b; color: #00796b; }
+    .order-type-tab.active {
       background: #00897b;
       border-color: #00897b;
       color: #fff;
+    }
+
+    .menu-main { flex: 1 1 auto; min-width: 0; }
+
+    /* === Category filter tabs (vertical sidebar to the left of the grid) === */
+    /* Minimal nav-list style: no pill background, just a left accent bar
+       and color shift on the active item. Reads as a filter list rather
+       than a row of buttons. */
+    .menu-cat-tabs {
+      display: flex;
+      flex-direction: column;
+      flex: 0 0 108px;
+      border-left: 2px solid #eee;
+    }
+    .menu-cat-tab {
+      border: none;
+      border-left: 2px solid transparent;
+      margin-left: -2px;
+      background: transparent;
+      color: #777;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: color .12s ease, border-color .12s ease, background .12s ease;
+    }
+    .menu-cat-tab:hover { color: #00796b; background: #f2f9f8; }
+    .menu-cat-tab.active {
+      border-left-color: #00897b;
+      color: #00796b;
+      background: #e0f2f1;
+      font-weight: 700;
     }
     /* === Color tag dot + popover === */
 .menu-item { position: relative; } /* needed so the popover positions correctly */
@@ -146,6 +195,33 @@
   margin-bottom: 4px;
   box-sizing: border-box;
 }
+    /* Edit-mode card needs a bit more room to fit both price fields */
+    .menu-item:has(.price-edit-row) { height: auto; min-height: 104px; padding-bottom: 10px; }
+    .price-edit-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+    }
+    .price-edit-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: .68rem;
+      font-weight: 600;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }
+    .price-edit-label .price-tag { font-size: .82rem; }
+    .price-input-delivery {
+      width: 56px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 1px 3px;
+      font-size: .85rem;
+    }
     .menu-item.just-added { animation: menuAdd .3s ease; }
     @keyframes menuAdd {
       0% { transform: scale(1); }
@@ -221,6 +297,14 @@
     @media (prefers-reduced-motion: reduce) {
       .menu-item, .toast { transition: none !important; animation: none !important; }
     }
+
+    /* Stack the category sidebar above the grid, and let order type tabs
+       fill the width, on narrow screens */
+    @media (max-width: 700px) {
+      .order-type-tab { flex: 1 1 0; padding: 10px 6px; }
+      .menu-body-layout { flex-direction: column; }
+      .menu-cat-tabs { flex-direction: row; flex: 0 0 auto; width: 100%; flex-wrap: wrap; }
+    }
   </style>
 </head>
 <body>
@@ -267,15 +351,32 @@
             <h2>Menu</h2>
             <div id="priceControls"></div>
           </div>
-          <div class="menu-cat-tabs" id="menuCatTabs">
-            <button class="menu-cat-tab active" data-category="matcha">Matcha</button>
-            <button class="menu-cat-tab" data-category="coffee">Coffee</button>
-            <button class="menu-cat-tab" data-category="dessert">Dessert</button>
-            <button class="menu-cat-tab" data-category="uncategorized">Uncategorized</button>
+
+          <!-- Order type: Dine In / Delivery. Each still shows all
+               categories — it only changes which price is used. -->
+          <div class="order-type-tabs" id="orderTypeTabs">
+            <button class="order-type-tab active" data-ordertype="dineIn">
+              <span class="order-type-icon">🍽️</span>Dine In
+            </button>
+            <button class="order-type-tab" data-ordertype="delivery">
+              <span class="order-type-icon">🛵</span>Delivery
+            </button>
           </div>
-          <div class="menu-items" id="menuItems"></div>
-          <div id="menuEmptyState" class="empty-state hidden">
-            No menu yettt yet. Add your first drink in <a href="menu-recipes.html">Menu Recipes</a>.
+
+          <div class="menu-body-layout">
+            <div class="menu-cat-tabs" id="menuCatTabs">
+              <button class="menu-cat-tab active" data-category="matcha">Matcha</button>
+              <button class="menu-cat-tab" data-category="coffee">Coffee</button>
+              <button class="menu-cat-tab" data-category="dessert">Dessert</button>
+              <button class="menu-cat-tab" data-category="uncategorized">Uncategorized</button>
+            </div>
+
+            <div class="menu-main">
+              <div class="menu-items" id="menuItems"></div>
+              <div id="menuEmptyState" class="empty-state hidden">
+                No menu yettt yet. Add your first drink in <a href="menu-recipes.html">Menu Recipes</a>.
+              </div>
+            </div>
           </div>
         </div>
 

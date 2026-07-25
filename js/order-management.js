@@ -11,6 +11,12 @@ let dragSrcIndex = null;
 // Defaults to "matcha" so the page opens straight into that tab.
 let activeMenuCategoryFilter = "matcha";
 
+// === Order type state (Dine In / Delivery) ===
+// Each menu item can now carry two prices: `price` (dine in) and
+// `priceDelivery` (delivery). If an item has no priceDelivery set yet,
+// it falls back to the dine-in price so old menu data keeps working.
+let activeOrderType = "dineIn"; // "dineIn" | "delivery"
+
 // === Menu card color tagging ===
 // 5 preset colors only, kept simple — no custom color picker needed.
 const CARD_COLORS = [
@@ -29,6 +35,7 @@ const menuContainer = document.getElementById("menuItems");
 const priceControls = document.getElementById("priceControls");
 const menuEmptyState = document.getElementById("menuEmptyState");
 const menuCatTabs = document.getElementById("menuCatTabs");
+const orderTypeTabs = document.getElementById("orderTypeTabs");
 const cartList = document.getElementById("cartList");
 const cartEmptyState = document.getElementById("cartEmptyState");
 const summarySubtotal = document.getElementById("summarySubtotal");
@@ -65,6 +72,50 @@ function showOrderToast(message) {
   toast.classList.add("show");
   clearTimeout(orderToastTimer);
   orderToastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
+}
+
+// === Price resolution helper ===
+// Single source of truth for "what does this item cost right now" —
+// used by rendering, add-to-cart, and nowhere else, so dine-in vs
+// delivery pricing can never drift apart between the menu grid and the cart.
+function getItemPrice(item, orderType = activeOrderType) {
+  if (orderType === "delivery") {
+    const dPrice = parseFloat(item.priceDelivery);
+    return !isNaN(dPrice) ? dPrice : parseFloat(item.price);
+  }
+  return parseFloat(item.price);
+}
+
+// === Order type tabs (Dine In / Delivery) ===
+// Sits to the left of the category tabs. Selecting a type still shows
+// every category — it only changes which price is used/displayed.
+// Switching type with items already in the cart clears the cart, since
+// the two order types can have different prices for the same drink.
+function setupOrderTypeTabs() {
+  if (!orderTypeTabs) return;
+  orderTypeTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest(".order-type-tab");
+    if (!btn) return;
+    const newType = btn.dataset.ordertype;
+    if (newType === activeOrderType) return;
+
+    if (cart.length) {
+      const label = newType === "delivery" ? "Delivery" : "Dine In";
+      const ok = confirm(
+        `Switch to ${label}? Dine In and Delivery can have different prices, so your current cart will be cleared.`
+      );
+      if (!ok) return;
+      cart = [];
+      resetDiscount();
+      updateCart();
+    }
+
+    activeOrderType = newType;
+    [...orderTypeTabs.children].forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderMenu("view");
+    showOrderToast(newType === "delivery" ? "🛵 Delivery pricing" : "🍽️ Dine In pricing");
+  });
 }
 
 // === Category filter tabs ===
@@ -138,13 +189,26 @@ function renderMenu(mode = "view") {
               class="name-input"
               data-index="${index}"
               aria-label="Name for ${item.name}">
-        <span class="price-tag">RM <input
+        <div class="price-edit-row">
+          <label class="price-edit-label">Dine In
+            <span class="price-tag">RM <input
               type="number"
               step="0.01"
               value="${parseFloat(item.price).toFixed(2)}"
               class="price-input"
               data-index="${index}"
-              aria-label="Price for ${item.name}"></span>
+              aria-label="Dine In price for ${item.name}"></span>
+          </label>
+          <label class="price-edit-label">Delivery
+            <span class="price-tag">RM <input
+              type="number"
+              step="0.01"
+              value="${parseFloat(item.priceDelivery ?? item.price).toFixed(2)}"
+              class="price-input-delivery"
+              data-index="${index}"
+              aria-label="Delivery price for ${item.name}"></span>
+          </label>
+        </div>
       `;
     } else if (mode === "reorder") {
       div.classList.add("draggable-item");
@@ -156,13 +220,14 @@ function renderMenu(mode = "view") {
       `;
       attachDragHandlers(div, index);
     } else {
+      const price = getItemPrice(item);
       div.innerHTML = `
         <strong>${item.name}</strong>
-        <span class="price-tag">RM${parseFloat(item.price).toFixed(2)}</span>
+        <span class="price-tag">RM${price.toFixed(2)}</span>
       `;
       div.tabIndex = 0;
       div.setAttribute("role", "button");
-      div.setAttribute("aria-label", `Add ${item.name}, RM${parseFloat(item.price).toFixed(2)}, to cart`);
+      div.setAttribute("aria-label", `Add ${item.name}, RM${price.toFixed(2)}, to cart`);
       div.onclick = () => addToCart(index, div);
       div.onkeydown = (e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -334,6 +399,7 @@ function renderPriceEditorIfAdmin() {
  editBtn.addEventListener("click", () => {
     if (currentMode === "editPrices") {
       const priceInputs = document.querySelectorAll(".price-input");
+      const deliveryPriceInputs = document.querySelectorAll(".price-input-delivery");
       const nameInputs = document.querySelectorAll(".name-input");
 
       // Validate names first — don't allow saving a blank name
@@ -358,6 +424,12 @@ function renderPriceEditorIfAdmin() {
         const idx = input.dataset.index;
         const newPrice = parseFloat(input.value);
         if (!isNaN(newPrice)) sampleMenu[idx].price = newPrice;
+      });
+
+      deliveryPriceInputs.forEach((input) => {
+        const idx = input.dataset.index;
+        const newPrice = parseFloat(input.value);
+        if (!isNaN(newPrice)) sampleMenu[idx].priceDelivery = newPrice;
       });
 
       localStorage.setItem("menuItems", JSON.stringify(sampleMenu));
@@ -397,11 +469,15 @@ function renderPriceEditorIfAdmin() {
 // === Cart Functions ===
 function addToCart(index, cardEl) {
   const selected = sampleMenu[index];
+  const price = getItemPrice(selected);
+  // Same drink bought under different order types is kept as separate cart
+  // lines automatically, since switching order type clears the cart —
+  // matching by name alone stays safe.
   const existing = cart.find(i => i.name === selected.name);
   if (existing) {
     existing.qty++;
   } else {
-    cart.push({ name: selected.name, price: selected.price, qty: 1 });
+    cart.push({ name: selected.name, price, qty: 1 });
   }
   updateCart();
 
@@ -626,6 +702,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderMenu();
   renderPriceEditorIfAdmin();
   setupMenuCategoryTabs();
+  setupOrderTypeTabs();
 
   const user = localStorage.getItem("mintchaUser");
   if (!user) {
@@ -665,6 +742,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const dateStr = now.toLocaleString("en-MY", options);
 
         const cashier = localStorage.getItem("mintchaUser") || "Unknown";
+        const orderTypeLabel = activeOrderType === "delivery" ? "Delivery" : "Dine In";
 
         // Totals — calculated via the shared calculateDiscount() function so the
         // receipt/sale total always matches what was shown in the cart preview.
@@ -679,6 +757,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="receipt-header">
             <div><strong>${dateStr}</strong></div>
             <div>Order ID: ${orderId}</div>
+            <div>Order Type: ${orderTypeLabel}</div>
             <div>Cashier: ${cashier}</div>
           </div>
           <div class="receipt-body">
@@ -704,6 +783,7 @@ document.addEventListener("DOMContentLoaded", () => {
           cashier,
           customer,
           note,
+          orderType: orderTypeLabel,
           items: [...cart],
           paymentMethod: method,
           subtotal,
