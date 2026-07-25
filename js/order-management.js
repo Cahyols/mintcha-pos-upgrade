@@ -86,6 +86,18 @@ function getItemPrice(item, orderType = activeOrderType) {
   return parseFloat(item.price);
 }
 
+// === Current admin mode helper ===
+// Reads which of Edit Menu / Reorder Menu is currently active (if any),
+// so other UI (order type tabs, color tagging) can re-render in the same
+// mode instead of silently kicking the admin back to plain "view".
+function getCurrentAdminMode() {
+  const editBtn = document.getElementById("toggleEditPrices");
+  const reorderBtn = document.getElementById("toggleReorder");
+  if (editBtn?.classList.contains("active-mode")) return "editPrices";
+  if (reorderBtn?.classList.contains("active-mode")) return "reorder";
+  return "view";
+}
+
 // === Order type tabs (Dine In / Delivery) ===
 // Sits to the left of the category tabs. Selecting a type still shows
 // every category — it only changes which price is used/displayed.
@@ -113,7 +125,7 @@ function setupOrderTypeTabs() {
     activeOrderType = newType;
     [...orderTypeTabs.children].forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    renderMenu("view");
+    renderMenu(getCurrentAdminMode());
     showOrderToast(newType === "delivery" ? "🛵 Delivery pricing" : "🍽️ Dine In pricing");
   });
 }
@@ -182,6 +194,12 @@ function renderMenu(mode = "view") {
     }
 
     if (mode === "editPrices") {
+      const isDelivery = activeOrderType === "delivery";
+      const label = isDelivery ? "Delivery" : "Dine In";
+      const priceValue = isDelivery
+        ? parseFloat(item.priceDelivery ?? item.price)
+        : parseFloat(item.price);
+      const inputClass = isDelivery ? "price-input-delivery" : "price-input";
       div.innerHTML = `
         <input
               type="text"
@@ -189,26 +207,15 @@ function renderMenu(mode = "view") {
               class="name-input"
               data-index="${index}"
               aria-label="Name for ${item.name}">
-        <div class="price-edit-row">
-          <label class="price-edit-label">Dine In
-            <span class="price-tag">RM <input
+        <label class="price-edit-label">${label}
+          <span class="price-tag">RM <input
               type="number"
               step="0.01"
-              value="${parseFloat(item.price).toFixed(2)}"
-              class="price-input"
+              value="${priceValue.toFixed(2)}"
+              class="${inputClass}"
               data-index="${index}"
-              aria-label="Dine In price for ${item.name}"></span>
-          </label>
-          <label class="price-edit-label">Delivery
-            <span class="price-tag">RM <input
-              type="number"
-              step="0.01"
-              value="${parseFloat(item.priceDelivery ?? item.price).toFixed(2)}"
-              class="price-input-delivery"
-              data-index="${index}"
-              aria-label="Delivery price for ${item.name}"></span>
-          </label>
-        </div>
+              aria-label="${label} price for ${item.name}"></span>
+        </label>
       `;
     } else if (mode === "reorder") {
       div.classList.add("draggable-item");
@@ -216,7 +223,7 @@ function renderMenu(mode = "view") {
       div.innerHTML = `
         <span class="drag-handle" title="Drag to reorder">⠿</span>
         <strong>${item.name}</strong>
-        <span class="price-tag">RM${parseFloat(item.price).toFixed(2)}</span>
+        <span class="price-tag">RM${getItemPrice(item).toFixed(2)}</span>
       `;
       attachDragHandlers(div, index);
     } else {
@@ -322,15 +329,7 @@ function setCardColor(index, colorValue) {
 
   // Re-render in whatever mode is currently active, so admin edit/reorder
   // modes keep working after a color change
-  const editBtn = document.getElementById("toggleEditPrices");
-  const reorderBtn = document.getElementById("toggleReorder");
-  if (editBtn?.classList.contains("active-mode")) {
-    renderMenu("editPrices");
-  } else if (reorderBtn?.classList.contains("active-mode")) {
-    renderMenu("reorder");
-  } else {
-    renderMenu("view");
-  }
+  renderMenu(getCurrentAdminMode());
   showOrderToast(colorValue ? "Card color updated" : "Card color cleared");
 }
 

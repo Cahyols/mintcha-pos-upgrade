@@ -23,6 +23,31 @@
       margin-right: 2px;
     }
 
+    /* === Minimalist panel sizing ===
+       style.css's .menu-panel/.cart-panel are shared with other pages, so
+       rather than edit that shared file, these page-scoped overrides trim
+       the padding and drop the fixed 400px min-height that was making both
+       panels feel oversized on this page specifically. */
+    .order-container { gap: 1.25rem; }
+    .menu-panel, .cart-panel {
+      padding: 1rem 1.15rem;
+      min-height: 0;
+    }
+    /* style.css gives both panels an even flex: 1 (50/50) — this page
+       reads better with more room for the menu grid than the cart form. */
+    .menu-panel { flex: 3; }
+    .cart-panel { flex: 2; }
+    .menu-panel-header h2,
+    .cart-panel > h2 {
+      font-size: 1.15rem;
+      margin-bottom: 0;
+    }
+    .cart-panel > h2 {
+      margin-bottom: 4px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #eee;
+    }
+
     /* === Menu body layout: category sidebar on the left, grid on the
        right. Order type tabs sit above this whole row. === */
     .menu-body-layout {
@@ -195,32 +220,27 @@
   margin-bottom: 4px;
   box-sizing: border-box;
 }
-    /* Edit-mode card needs a bit more room to fit both price fields */
-    .menu-item:has(.price-edit-row) { height: auto; min-height: 104px; padding-bottom: 10px; }
-    .price-edit-row {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      width: 100%;
-    }
+    /* Edit-mode card needs a little room to fit name + one price field */
+    .menu-item:has(.price-edit-label) { height: auto; min-height: 104px; padding-bottom: 10px; }
     .price-edit-label {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 6px;
-      font-size: .68rem;
-      font-weight: 600;
+      font-size: .7rem;
+      font-weight: 700;
       color: #777;
       text-transform: uppercase;
       letter-spacing: .02em;
+      width: 100%;
     }
-    .price-edit-label .price-tag { font-size: .82rem; }
+    .price-edit-label .price-tag { font-size: .88rem; }
     .price-input-delivery {
-      width: 56px;
+      width: 64px;
       border: 1px solid #ccc;
       border-radius: 4px;
-      padding: 1px 3px;
-      font-size: .85rem;
+      padding: 2px 4px;
+      font-size: .88rem;
     }
     .menu-item.just-added { animation: menuAdd .3s ease; }
     @keyframes menuAdd {
