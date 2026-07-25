@@ -122,6 +122,75 @@
     
   </div>
 
+  <!-- === Manual Sale Entry Modal (Admin only) — for re-keying past sales with a custom date/time === -->
+  <div id="addSaleModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeAddSaleModal" class="close">&times;</span>
+      <h2>➕ Add Sale (Manual Entry)</h2>
+
+      <label>Date &amp; Time:
+        <input type="datetime-local" id="saleDateTime" />
+      </label>
+
+      <label>Cashier:
+        <input type="text" id="saleCashier" placeholder="e.g. admin" />
+      </label>
+
+      <label>Customer:
+        <input type="text" id="saleCustomer" placeholder="Walk-in" />
+      </label>
+
+      <div id="saleItemsContainer">
+        <h4>Items</h4>
+        <div class="sale-item-row">
+          <input type="number" min="1" class="item-qty" placeholder="Qty" value="1" />
+          <input type="text" class="item-name" placeholder="Item name" />
+          <input type="number" min="0" step="0.01" class="item-price" placeholder="Price (RM)" />
+        </div>
+      </div>
+      <button type="button" id="addItemRowBtn" class="admin-btn">+ Add Item</button>
+
+      <label>Note:
+        <input type="text" id="saleNote" placeholder="Optional note" />
+      </label>
+
+      <label>Payment Method:
+        <select id="salePayment">
+          <option value="Cash">Cash</option>
+          <option value="QR">QR</option>
+          <option value="Ewallet">Ewallet</option>
+          <option value="Card">Card</option>
+        </select>
+      </label>
+
+      <label>Discount Type:
+        <input type="text" id="saleDiscountType" placeholder="None / 10% Off / etc." value="None" />
+      </label>
+
+      <label>Discount Amount (RM):
+        <input type="number" min="0" step="0.01" id="saleDiscountAmount" value="0" />
+      </label>
+
+      <label>Status:
+        <select id="saleStatus">
+          <option value="Completed">Completed</option>
+          <option value="Preparing">Preparing</option>
+          <option value="Refunded">Refunded</option>
+        </select>
+      </label>
+
+      <label id="refundReasonWrap" style="display:none;">Refund Reason:
+        <input type="text" id="saleRefundReason" placeholder="Reason for refund" />
+      </label>
+
+      <div class="modal-actions">
+        <button id="saveManualSaleBtn" class="admin-btn export-btn">Save Sale</button>
+        <button id="cancelManualSaleBtn" class="admin-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- === Scripts === -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="js/common.js"></script>

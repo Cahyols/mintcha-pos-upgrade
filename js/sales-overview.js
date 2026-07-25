@@ -73,6 +73,14 @@ document.addEventListener("DOMContentLoaded", () => {
       undoBtn.onclick = undoLastImport;
       exportControls.appendChild(undoBtn);
       refreshUndoButtonState();
+
+      // === Add Sale (Manual Entry) — re-key past sales with a custom date/time ===
+      const addSaleBtn = document.createElement("button");
+      addSaleBtn.textContent = "➕ Add Sale (Manual Entry)";
+      addSaleBtn.className = "admin-btn export-btn";
+      addSaleBtn.onclick = openAddSaleModal;
+      exportControls.appendChild(addSaleBtn);
+      setupAddSaleModal();
     }
   }
 
@@ -315,6 +323,140 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSalesPage(currentPage);
     renderPagination();
   };
+
+  // === Manual Sale Entry (Admin) ===
+  function setupAddSaleModal() {
+    const modal = document.getElementById("addSaleModal");
+    if (!modal || modal.dataset.wired) return; // only wire event listeners once
+    modal.dataset.wired = "true";
+
+    document.getElementById("closeAddSaleModal").onclick = closeAddSaleModal;
+    document.getElementById("cancelManualSaleBtn").onclick = closeAddSaleModal;
+    document.getElementById("addItemRowBtn").onclick = addItemRow;
+    document.getElementById("saveManualSaleBtn").onclick = saveManualSale;
+
+    document.getElementById("saleStatus").onchange = (e) => {
+      const wrap = document.getElementById("refundReasonWrap");
+      wrap.style.display = e.target.value === "Refunded" ? "block" : "none";
+    };
+  }
+
+  function openAddSaleModal() {
+    const modal = document.getElementById("addSaleModal");
+
+    // Reset fields to defaults every time it's opened
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    document.getElementById("saleDateTime").value =
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    document.getElementById("saleCashier").value = user || "";
+    document.getElementById("saleCustomer").value = "Walk-in";
+    document.getElementById("saleNote").value = "";
+    document.getElementById("salePayment").value = "Cash";
+    document.getElementById("saleDiscountType").value = "None";
+    document.getElementById("saleDiscountAmount").value = "0";
+    document.getElementById("saleStatus").value = "Completed";
+    document.getElementById("saleRefundReason").value = "";
+    document.getElementById("refundReasonWrap").style.display = "none";
+
+    // Reset item rows to a single blank row
+    const itemsContainer = document.getElementById("saleItemsContainer");
+    itemsContainer.querySelectorAll(".sale-item-row").forEach((row, i) => {
+      if (i > 0) row.remove();
+    });
+    const firstRow = itemsContainer.querySelector(".sale-item-row");
+    if (firstRow) {
+      firstRow.querySelector(".item-qty").value = 1;
+      firstRow.querySelector(".item-name").value = "";
+      firstRow.querySelector(".item-price").value = "";
+    }
+
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
+  }
+
+  function closeAddSaleModal() {
+    const modal = document.getElementById("addSaleModal");
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+  }
+
+  function addItemRow() {
+    const itemsContainer = document.getElementById("saleItemsContainer");
+    const row = document.createElement("div");
+    row.className = "sale-item-row";
+    row.innerHTML = `
+      <input type="number" min="1" class="item-qty" placeholder="Qty" value="1" />
+      <input type="text" class="item-name" placeholder="Item name" />
+      <input type="number" min="0" step="0.01" class="item-price" placeholder="Price (RM)" />
+      <button type="button" class="remove-item-row-btn">✕</button>
+    `;
+    row.querySelector(".remove-item-row-btn").onclick = () => row.remove();
+    itemsContainer.appendChild(row);
+  }
+
+  function generateNextOrderId() {
+    const allSales = loadSales();
+    let maxNum = 0;
+    allSales.forEach(s => {
+      const m = String(s.id || "").match(/^ORD-(\d+)$/);
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+    });
+    return `ORD-${String(maxNum + 1).padStart(4, "0")}`;
+  }
+
+  function saveManualSale() {
+    const dateTimeValue = document.getElementById("saleDateTime").value;
+    if (!dateTimeValue) {
+      alert("Please set a date & time for this sale.");
+      return;
+    }
+
+    const itemRows = document.querySelectorAll("#saleItemsContainer .sale-item-row");
+    const items = [];
+    itemRows.forEach(row => {
+      const qty = parseInt(row.querySelector(".item-qty").value, 10) || 0;
+      const name = row.querySelector(".item-name").value.trim();
+      const price = parseFloat(row.querySelector(".item-price").value) || 0;
+      if (name && qty > 0) {
+        items.push({ qty, name, price });
+      }
+    });
+
+    if (items.length === 0) {
+      alert("Please add at least one item with a name and quantity.");
+      return;
+    }
+
+    const subtotal = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+    const discountAmount = parseFloat(document.getElementById("saleDiscountAmount").value) || 0;
+    const total = Math.max(0, subtotal - discountAmount);
+    const status = document.getElementById("saleStatus").value;
+
+    const sale = {
+      id: generateNextOrderId(),
+      date: dateTimeValue, // e.g. "2026-07-14T13:30" — parseDateSafe/new Date() reads this natively
+      cashier: document.getElementById("saleCashier").value.trim(),
+      customer: document.getElementById("saleCustomer").value.trim() || "Walk-in",
+      items,
+      note: document.getElementById("saleNote").value.trim(),
+      subtotal,
+      discountType: document.getElementById("saleDiscountType").value.trim() || "None",
+      discountAmount,
+      total,
+      paymentMethod: document.getElementById("salePayment").value,
+      status,
+      refundReason: status === "Refunded" ? document.getElementById("saleRefundReason").value.trim() : ""
+    };
+
+    const allSales = loadSales();
+    allSales.push(sale);
+    localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
+
+    closeAddSaleModal();
+    alert(`✅ Sale ${sale.id} added for ${new Date(dateTimeValue).toLocaleString()}.`);
+    window.applyFilters ? window.applyFilters() : (filteredSales = loadSales(), renderSalesPage(currentPage), renderPagination());
+  }
 });
 
 // === CSV Export Function ===
