@@ -97,6 +97,17 @@ document.addEventListener("DOMContentLoaded", () => {
       fixDatesBtn.onclick = fixCorruptedDates;
       exportControls.appendChild(fixDatesBtn);
 
+      // === Repair Missing Subtotal / Discount Amount (backfills sales imported before
+      // the Subtotal/Discount Amount columns existed in the export/import format) ===
+      const repairMoneyBtn = document.createElement("button");
+      repairMoneyBtn.id = "repairMoneyBtn";
+      repairMoneyBtn.textContent = "🧮 Repair Missing Subtotal/Discount";
+      repairMoneyBtn.className = "admin-btn export-btn";
+      repairMoneyBtn.style.backgroundColor = "#455a64";
+      repairMoneyBtn.style.color = "#fff";
+      repairMoneyBtn.onclick = repairMissingSubtotals;
+      exportControls.appendChild(repairMoneyBtn);
+
       // === Add Sale (Manual Entry) — re-key past sales with a custom date/time ===
       const addSaleBtn = document.createElement("button");
       addSaleBtn.textContent = "➕ Add Sale (Manual Entry)";
@@ -108,13 +119,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // === Load initial data
-  filteredSales = loadSales();
+  filteredSales = sortSalesByDateDesc(loadSales());
   populateCashierDropdown();
   renderSalesPage(currentPage);
   renderPagination();
 
   function loadSales() {
     return JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+  }
+
+  // === Sort a list of sales newest-first (31 -> 1). Sales with an
+  // unparseable date are pushed to the bottom rather than dropped. ===
+  function sortSalesByDateDesc(sales) {
+    return [...sales].sort((a, b) => {
+      const da = parseDateSafe(a.date);
+      const db = parseDateSafe(b.date);
+      if (!da && !db) return 0;
+      if (!da) return 1;  // a has no date -> goes after b
+      if (!db) return -1; // b has no date -> a comes first
+      return db.getTime() - da.getTime();
+    });
   }
 
   function populateCashierDropdown() {
@@ -334,6 +358,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return matchStart && matchEnd && matchCashier && matchPayment && matchStatus;
     });
 
+    filteredSales = sortSalesByDateDesc(filteredSales);
+
     currentPage = 1;
     renderSalesPage(currentPage);
     renderPagination();
@@ -346,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("filterPayment").value = "";
     document.getElementById("filterStatus").value = "";
 
-    filteredSales = loadSales();
+    filteredSales = sortSalesByDateDesc(loadSales());
     currentPage = 1;
     renderSalesPage(currentPage);
     renderPagination();
@@ -379,6 +405,77 @@ document.addEventListener("DOMContentLoaded", () => {
 
     localStorage.setItem("mintcha_sales", JSON.stringify(repaired));
     alert(`✅ Fixed ${fixedCount} sale(s).`);
+    location.reload();
+  }
+
+  // === One-time repair for sales imported before Subtotal/Discount Amount
+  // were part of the export/import format. Those sales have `total` correct
+  // but `subtotal` and `discountAmount` missing (both read as 0 on Dashboard).
+  //
+  // Best-effort backfill:
+  //   - recompute subtotal as sum(qty × current menu price) for each item
+  //     (falls back to item.price if the item isn't found on the current menu)
+  //   - if that computed subtotal is sane (>= total), set discountAmount = subtotal - total
+  //   - if it's Free-type or unmatched, leave discountAmount at 0 and subtotal = total
+  //   - only touches sales where subtotal is currently missing/blank so it never
+  //     overwrites correctly-imported data
+  function repairMissingSubtotals() {
+    const allSales = loadSales();
+    const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
+    const priceMap = {};
+    menuItems.forEach(m => { priceMap[m.name] = m.price || 0; });
+
+    let fixedCount = 0;
+
+    const repaired = allSales.map(sale => {
+      const hasSubtotal = sale.subtotal !== undefined && sale.subtotal !== null && sale.subtotal !== "";
+      const hasDiscountAmount = sale.discountAmount !== undefined && sale.discountAmount !== null && sale.discountAmount !== "";
+      if (hasSubtotal && hasDiscountAmount) return sale; // already fine, don't touch
+
+      const total = parseFloat(sale.total || 0);
+
+      let computedSubtotal = (sale.items || []).reduce((sum, item) => {
+        const qty = item.qty || 0;
+        const price = priceMap[item.name] ?? item.price ?? 0;
+        return sum + qty * price;
+      }, 0);
+
+      // Round to 2dp to avoid float noise
+      computedSubtotal = Math.round(computedSubtotal * 100) / 100;
+
+      let newSubtotal = sale.subtotal;
+      let newDiscountAmount = sale.discountAmount;
+
+      if (!hasSubtotal) {
+        // If the recomputed subtotal is at least the total, trust it.
+        // Otherwise (e.g. items didn't match current menu names) fall back to total,
+        // which at minimum makes "Grand Total" reconcile even if the discount split doesn't.
+        newSubtotal = computedSubtotal >= total ? computedSubtotal : total;
+      }
+
+      if (!hasDiscountAmount) {
+        const base = newSubtotal ?? computedSubtotal;
+        newDiscountAmount = sale.discountType === "Free"
+          ? base
+          : Math.max(0, Math.round((base - total) * 100) / 100);
+      }
+
+      if (newSubtotal !== sale.subtotal || newDiscountAmount !== sale.discountAmount) {
+        fixedCount++;
+        return { ...sale, subtotal: newSubtotal, discountAmount: newDiscountAmount };
+      }
+      return sale;
+    });
+
+    if (fixedCount === 0) {
+      alert("✅ No sales are missing Subtotal/Discount Amount — nothing to fix.");
+      return;
+    }
+
+    if (!confirm(`Found ${fixedCount} sale(s) missing Subtotal/Discount Amount (likely from an older import). Backfill them now using current menu prices as a best estimate?`)) return;
+
+    localStorage.setItem("mintcha_sales", JSON.stringify(repaired));
+    alert(`✅ Backfilled ${fixedCount} sale(s). Note: amounts are a best estimate based on current menu prices if the original per-item price wasn't available.`);
     location.reload();
   }
 
@@ -507,7 +604,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     closeAddSaleModal();
     alert(`✅ Sale ${sale.id} added for ${new Date(dateTimeValue).toLocaleString()}.`);
-    window.applyFilters ? window.applyFilters() : (filteredSales = loadSales(), renderSalesPage(currentPage), renderPagination());
+    window.applyFilters ? window.applyFilters() : (filteredSales = sortSalesByDateDesc(loadSales()), renderSalesPage(currentPage), renderPagination());
   }
 });
 
@@ -602,10 +699,13 @@ function formatSaleDateForDisplay(value) {
 }
 
 // === CSV Export Function ===
+// NOTE: now includes Subtotal and Discount Amount so a round-trip
+// export -> import no longer loses those two numbers (this was the root
+// cause of Dashboard showing RM0.00 for Subtotal/Discount/Free Value after import).
 function exportToCSV() {
   const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
   const rows = [
-    ["Order ID", "Date", "Cashier", "Customer", "Items", "Total", "Payment", "Discount", "Status", "Refund Reason"]
+    ["Order ID", "Date", "Cashier", "Customer", "Items", "Subtotal", "Total", "Payment", "Discount Type", "Discount Amount", "Status", "Refund Reason"]
   ];
 
   sales.forEach(s => {
@@ -618,9 +718,11 @@ function exportToCSV() {
       s.cashier,
       s.customer,
       itemStr,
+      s.subtotal ?? "",
       s.total,
       s.paymentMethod,
       s.discountType || "None",
+      s.discountAmount ?? "",
       s.status || "-",
       s.refundReason || "-"
     ]);
@@ -845,7 +947,7 @@ function handleImportFile(e) {
       }
 
       // Expect the same column order as exportToCSV():
-      // Order ID, Date, Cashier, Customer, Items, Total, Payment, Discount, Status, Refund Reason
+      // Order ID, Date, Cashier, Customer, Items, Subtotal, Total, Payment, Discount Type, Discount Amount, Status, Refund Reason
       const headerRow = rows[0].map(h => String(h).trim().toLowerCase());
       const dataRows = rows.slice(1);
 
@@ -857,9 +959,15 @@ function handleImportFile(e) {
       const idxCashier = col("cashier");
       const idxCustomer = col("customer");
       const idxItems = col("items");
+      const idxSubtotal = col("subtotal");
       const idxTotal = col("total");
       const idxPayment = col("payment");
-      const idxDiscount = col("discount");
+      // "Discount Amount" also contains the substring "discount", so find it first,
+      // then find the discount *type* column as whichever other "discount" column isn't it.
+      // This keeps old files (which only ever had a single "Discount" column, the type)
+      // working exactly as before.
+      const idxDiscountAmount = col("discount amount");
+      const idxDiscount = headerRow.findIndex((h, i) => h.includes("discount") && i !== idxDiscountAmount);
       const idxStatus = col("status");
       const idxRefundReason = col("refund reason");
 
@@ -873,6 +981,16 @@ function handleImportFile(e) {
           "⚠️ Couldn't find a 'Date' column in this file — every imported sale would end up with a blank date.\n\n" +
           "Check that your Date column header contains the word \"date\".\n\n" +
           "Continue importing anyway (dates will be blank)?"
+        );
+        if (!proceed) return;
+      }
+
+      if (idxSubtotal === -1 || idxDiscountAmount === -1) {
+        const proceed = confirm(
+          "⚠️ This file doesn't have 'Subtotal' / 'Discount Amount' columns (older export format).\n\n" +
+          "Sales imported from it will show RM0.00 for Subtotal/Discount/Free Drinks Value on the Dashboard " +
+          "until you run '🧮 Repair Missing Subtotal/Discount' afterwards.\n\n" +
+          "Continue importing anyway?"
         );
         if (!proceed) return;
       }
@@ -947,6 +1065,9 @@ function handleImportFile(e) {
               : { qty: 1, name: part, price: 0 };
           });
 
+        const subtotalVal = idxSubtotal !== -1 ? parseFloat(row[idxSubtotal]) : NaN;
+        const discountAmountVal = idxDiscountAmount !== -1 ? parseFloat(row[idxDiscountAmount]) : NaN;
+
         parsedRows.push({
           _sortDate: sortDate,
           sale: {
@@ -955,9 +1076,14 @@ function handleImportFile(e) {
             cashier: String(row[idxCashier] ?? ""),
             customer: String(row[idxCustomer] ?? ""),
             items,
+            // Only set subtotal/discountAmount when the column actually existed and parsed
+            // to a number — otherwise omit the key entirely so it can be picked up later
+            // by "🧮 Repair Missing Subtotal/Discount" instead of silently locking in a 0.
+            ...(idxSubtotal !== -1 && !isNaN(subtotalVal) ? { subtotal: subtotalVal } : {}),
             total: parseFloat(row[idxTotal]) || 0,
             paymentMethod: String(row[idxPayment] ?? ""),
-            discountType: String(row[idxDiscount] ?? "None"),
+            discountType: idxDiscount !== -1 ? String(row[idxDiscount] ?? "None") : "None",
+            ...(idxDiscountAmount !== -1 && !isNaN(discountAmountVal) ? { discountAmount: discountAmountVal } : {}),
             status: String(row[idxStatus] ?? ""),
             refundReason: idxRefundReason !== -1 ? String(row[idxRefundReason] ?? "") : ""
           }
@@ -1025,7 +1151,7 @@ function handleImportFile(e) {
           restored++;
         } else if (String(existing.date ?? "").trim() === sale.date) {
           // Same ID, same date -> genuinely the same sale, safe to refresh
-          // Preserve fields the export doesn't carry (subtotal, discountAmount, item prices)
+          // Preserve fields the export doesn't carry (item prices, etc.)
           salesById.set(sale.id, { ...existing, ...sale });
           updated++;
         } else {
@@ -1069,6 +1195,7 @@ function handleImportFile(e) {
         `✅ Restored ${restored} sale(s), updated ${updated} matching sale(s).\n` +
         (renamedCount ? `🔀 ${renamedCount} sale(s) reused an Order ID from a different day (${duplicateIdsFound.slice(0, 5).join(", ")}${duplicateIdsFound.length > 5 ? ", ..." : ""}) — auto-renamed with a "-b" suffix so none were lost.\n` : "") +
         (allConflicts.length ? `⚠️ ${allConflicts.length} sale(s) need review — Order ID exists locally with a different date.\nClick "⚠️ Review Conflicts" to compare and resolve them.\n` : "") +
+        ((idxSubtotal === -1 || idxDiscountAmount === -1) ? `🧮 This file lacked Subtotal/Discount Amount columns — run "🧮 Repair Missing Subtotal/Discount" to backfill those imported sales.\n` : "") +
         (skippedBlank ? `Skipped ${skippedBlank} blank row(s).\n` : "") +
         `If this wasn't the file you meant to import, click "↩️ Undo Last Import" to revert.`
       );
