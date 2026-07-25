@@ -352,6 +352,99 @@
     @media (max-width: 500px) {
       .summary-hero .value { font-size: 1.6rem; }
     }
+
+    /* === Hourly Report toggle button === */
+    .hourly-toggle-btn {
+      background: #fff;
+      border: 1px solid #00897b;
+      color: #00796b;
+    }
+    .hourly-toggle-btn.active {
+      background: #00897b;
+      color: #fff;
+      font-weight: 700;
+    }
+    .hourly-toggle-btn:hover { background: #e0f2f1; }
+    .hourly-toggle-btn.active:hover { background: #00796b; }
+
+    /* === Hourly Report panel === */
+    .hourly-peak-banner {
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      color: #8a6100;
+      font-size: .85rem;
+      font-weight: 600;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+    }
+    .hourly-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .hourly-row {
+      border: 1px solid #eee;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .hourly-row-main {
+      display: grid;
+      grid-template-columns: 105px 1fr 80px;
+      align-items: center;
+      gap: 10px;
+      font-size: .85rem;
+    }
+    .hourly-time {
+      color: #444;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .hourly-bar-track {
+      background: #f0f0f0;
+      border-radius: 6px;
+      height: 10px;
+      overflow: hidden;
+    }
+    .hourly-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00897b, #00c853);
+      border-radius: 6px;
+      transition: width .3s ease;
+    }
+    .hourly-revenue {
+      font-weight: 800;
+      color: #00796b;
+      text-align: right;
+    }
+    .hourly-row-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #f2f2f2;
+    }
+    .hourly-meta-item {
+      font-size: .75rem;
+      color: #666;
+      white-space: nowrap;
+    }
+    .hourly-top-cat {
+      font-weight: 700;
+      color: #00796b;
+    }
+    .hourly-discount {
+      color: #e65100;
+      font-size: .75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    @media (max-width: 600px) {
+      .hourly-row-main {
+        grid-template-columns: 80px 1fr 60px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -403,9 +496,16 @@
             <input type="date" id="summaryDatePicker" />
             <button id="summaryNextBtn" class="admin-btn range-nav-btn" aria-label="Next period">▶</button>
             <button id="summaryTodayBtn" class="admin-btn">Today</button>
+            <button id="hourlyToggleBtn" class="admin-btn hourly-toggle-btn">⏰ Hourly Report</button>
           </div>
           <div id="todaySummaryContent"></div>
-          
+
+        </section>
+
+        <!-- === Hourly Report (Admin only, Day view, toggled) === -->
+        <section id="hourlyReportCard" class="dashboard-card" style="display:none;">
+          <h3>⏰ Hourly Report</h3>
+          <div id="hourlyReportContent"></div>
         </section>
 
         <!-- === Low Stock Alerts Section === -->

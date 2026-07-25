@@ -82,6 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===================================================================
 
   let currentViewMode = "day"; // "day" | "week" | "month"
+  let hourlyReportOpen = false; // whether the Hourly Report panel is expanded
 
   function getRangeForMode(mode, refDate) {
     const start = new Date(refDate);
@@ -140,6 +141,119 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
+  // === Hourly Report helpers ===
+  function formatHourLabel(hour) {
+    const start = new Date(2000, 0, 1, hour);
+    const end = new Date(2000, 0, 1, hour + 1);
+    const opts = { hour: "numeric", hour12: true };
+    return `${start.toLocaleTimeString("en-MY", opts)} – ${end.toLocaleTimeString("en-MY", opts)}`;
+  }
+
+  const CATEGORY_DISPLAY_NAMES = {
+    matcha: "Matcha",
+    coffee: "Coffee",
+    dessert: "Dessert",
+    uncategorized: "Uncategorized"
+  };
+
+  function renderHourlyReport(rangeSales, mode) {
+    const card = document.getElementById("hourlyReportCard");
+    const content = document.getElementById("hourlyReportContent");
+    const toggleBtn = document.getElementById("hourlyToggleBtn");
+    if (!card || !content || !toggleBtn) return;
+
+    // Hourly breakdown only makes sense for a single day
+    if (mode !== "day") {
+      card.style.display = "none";
+      toggleBtn.style.display = "none";
+      return;
+    }
+    toggleBtn.style.display = "inline-block";
+
+    if (!hourlyReportOpen) {
+      card.style.display = "none";
+      toggleBtn.classList.remove("active");
+      return;
+    }
+
+    toggleBtn.classList.add("active");
+    card.style.display = "block";
+
+    const menuCategoryMap = loadMenuCategoryMap();
+
+    const hourly = Array.from({ length: 24 }, () => ({
+      revenue: 0,
+      transactions: 0,
+      discount: 0,
+      cups: 0,
+      categoryCups: {} // { matcha: 3, coffee: 1, ... } for this hour
+    }));
+
+    rangeSales.forEach(sale => {
+      const saleDate = parseDateSafe(sale.date);
+      if (!saleDate) return;
+      const h = saleDate.getHours();
+      const bucket = hourly[h];
+
+      bucket.revenue += parseFloat(sale.total || 0);
+      bucket.transactions += 1;
+      bucket.discount += parseFloat(sale.discountAmount || 0);
+
+      (sale.items || []).forEach(item => {
+        const qty = item.qty || 0;
+        bucket.cups += qty;
+
+        const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
+        const cat = CATEGORY_DISPLAY_NAMES[meta.category] ? meta.category : "uncategorized";
+        bucket.categoryCups[cat] = (bucket.categoryCups[cat] || 0) + qty;
+      });
+    });
+
+    const activeHours = hourly
+      .map((data, hour) => ({ hour, ...data }))
+      .filter(h => h.transactions > 0);
+
+    if (!activeHours.length) {
+      content.innerHTML = `<p style="text-align:center; color:#999;">No sales recorded in this period.</p>`;
+      return;
+    }
+
+    const maxRevenue = Math.max(...activeHours.map(h => h.revenue));
+    const peak = activeHours.reduce((a, b) => (b.revenue > a.revenue ? b : a));
+
+    content.innerHTML = `
+      <div class="hourly-peak-banner">
+        🔥 Peak Hour: <strong>${formatHourLabel(peak.hour)}</strong> — RM${peak.revenue.toFixed(2)} (${peak.transactions} bill${peak.transactions !== 1 ? "s" : ""}, ${peak.cups} cup${peak.cups !== 1 ? "s" : ""})
+      </div>
+      <div class="hourly-list">
+        ${activeHours.map(h => {
+          const avgTicket = h.transactions > 0 ? h.revenue / h.transactions : 0;
+          const topCatEntry = Object.entries(h.categoryCups).sort((a, b) => b[1] - a[1])[0];
+          const topCatLabel = topCatEntry ? CATEGORY_DISPLAY_NAMES[topCatEntry[0]] || topCatEntry[0] : "–";
+
+          return `
+          <div class="hourly-row">
+            <div class="hourly-row-main">
+              <span class="hourly-time">${formatHourLabel(h.hour)}</span>
+              <div class="hourly-bar-track">
+                <div class="hourly-bar-fill" style="width:${maxRevenue > 0 ? (h.revenue / maxRevenue) * 100 : 0}%"></div>
+              </div>
+              <span class="hourly-revenue">RM${h.revenue.toFixed(2)}</span>
+            </div>
+            <div class="hourly-row-meta">
+              <span class="hourly-meta-item">🧾 ${h.transactions} bill${h.transactions !== 1 ? "s" : ""}</span>
+              <span class="hourly-meta-item">🥤 ${h.cups} cup${h.cups !== 1 ? "s" : ""}</span>
+              <span class="hourly-meta-item">💳 Avg RM${avgTicket.toFixed(2)}</span>
+              <span class="hourly-meta-item hourly-top-cat">⭐ ${topCatLabel}</span>
+              ${h.discount > 0 ? `<span class="hourly-discount">-RM${h.discount.toFixed(2)} discount</span>` : ""}
+            </div>
+          </div>
+        `;
+        }).join("")}
+      </div>
+    `;
+  }
+
   // === Sales & Cup Summary for a given date range ===
   function renderSummaryForRange(startDate, endDate, mode) {
     const role = localStorage.getItem("mintchaRole");
@@ -169,6 +283,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!saleDate) return false;
       return saleDate >= startDate && saleDate <= endDate;
     });
+
+    // Render (or hide) the Hourly Report panel for this range
+    renderHourlyReport(rangeSales, mode);
 
     let totalRevenue = 0;
     let totalSubtotal = 0;
@@ -335,6 +452,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const prevBtn = document.getElementById("summaryPrevBtn");
     const nextBtn = document.getElementById("summaryNextBtn");
     const modeButtons = document.querySelectorAll(".view-mode-btn");
+    const hourlyToggleBtn = document.getElementById("hourlyToggleBtn");
     if (!datePicker) return;
 
     const today = new Date();
@@ -346,6 +464,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     todayBtn?.addEventListener("click", () => {
       datePicker.value = isoToday;
+      refreshSummary();
+    });
+
+    // === Toggle the Hourly Report panel open/closed ===
+    hourlyToggleBtn?.addEventListener("click", () => {
+      hourlyReportOpen = !hourlyReportOpen;
       refreshSummary();
     });
 
