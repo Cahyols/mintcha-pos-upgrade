@@ -1,3 +1,83 @@
+// === Shared date/sort helpers ===
+// These live at the top level (not inside DOMContentLoaded) so that BOTH the
+// on-screen table AND the CSV/JSON export functions use the exact same logic.
+// Previously these were declared only inside the DOMContentLoaded handler, so
+// exportToCSV()/exportSalesToJSON() (which run outside that scope) fell back to
+// whatever raw order the sales happened to be stored in — which is why the
+// exported file's row order didn't match what was shown on screen.
+
+// --- Safe Date Parser (Local-Time Aware) ---
+function parseDateSafe(dateString) {
+  if (!dateString) return null;
+
+  // 0️⃣ Bare Excel serial number stored as a string/number (e.g. "46333.868...")
+  //    Catches dates that were corrupted by a prior import before this fix existed.
+  const serialGuess = excelSerialToDate(dateString);
+  if (serialGuess) return serialGuess;
+
+  // 1️⃣ Try built-in parser first (handles ISO)
+  let d = new Date(dateString);
+  if (!isNaN(d.getTime())) return d;
+
+  // 2️⃣ Try DD/MM/YYYY or DD-MM-YYYY (with optional time)
+  const dtMatch = dateString.match(
+    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[ ,T]*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM|am|pm))?)?/
+  );
+  if (dtMatch) {
+    let [, day, month, year, hour, minute, second, ampm] = dtMatch;
+    day = parseInt(day, 10);
+    month = parseInt(month, 10) - 1;
+    year = parseInt(year, 10);
+    if (year < 100) year += 2000;
+
+    hour = hour ? parseInt(hour, 10) : 0;
+    minute = minute ? parseInt(minute, 10) : 0;
+    second = second ? parseInt(second, 10) : 0;
+
+    if (ampm) {
+      const up = ampm.toUpperCase();
+      if (up === "PM" && hour < 12) hour += 12;
+      if (up === "AM" && hour === 12) hour = 0;
+    }
+
+    // Create local time date
+    const localDate = new Date(year, month, day, hour, minute, second);
+    if (!isNaN(localDate.getTime())) return localDate;
+  }
+
+  // 3️⃣ Try ISO-like YYYY-MM-DD HH:MM
+  const isoParts = dateString.match(
+    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{2}):?(\d{2})?)?/
+  );
+  if (isoParts) {
+    let [, y, m, d2, h, min, s] = isoParts;
+    y = parseInt(y, 10);
+    m = parseInt(m, 10) - 1;
+    d2 = parseInt(d2, 10);
+    h = h ? parseInt(h, 10) : 0;
+    min = min ? parseInt(min, 10) : 0;
+    s = s ? parseInt(s, 10) : 0;
+    const localDate = new Date(y, m, d2, h, min, s);
+    if (!isNaN(localDate.getTime())) return localDate;
+  }
+
+  return null;
+}
+
+// === Sort a list of sales by date AND time descending (31 -> 1, latest time
+// first within the same day). Sales with an unparseable date are pushed to
+// the bottom rather than dropped. ===
+function sortSalesByDateDesc(sales) {
+  return [...sales].sort((a, b) => {
+    const da = parseDateSafe(a.date);
+    const db = parseDateSafe(b.date);
+    if (!da && !db) return 0;
+    if (!da) return 1;  // a has no date -> goes after b
+    if (!db) return -1; // b has no date -> a comes first
+    return db.getTime() - da.getTime(); // Newest date & time first
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const tableBody = document.getElementById("salesTableBody");
   const pageSize = 50;
@@ -128,19 +208,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
   }
 
-  // === Sort a list of sales newest-first (31 -> 1). Sales with an
-  // unparseable date are pushed to the bottom rather than dropped. ===
-  function sortSalesByDateDesc(sales) {
-    return [...sales].sort((a, b) => {
-      const da = parseDateSafe(a.date);
-      const db = parseDateSafe(b.date);
-      if (!da && !db) return 0;
-      if (!da) return 1;  // a has no date -> goes after b
-      if (!db) return -1; // b has no date -> a comes first
-      return db.getTime() - da.getTime();
-    });
-  }
-
   function populateCashierDropdown() {
     const cashierSelect = document.getElementById("filterCashier");
     if (!cashierSelect) return;
@@ -154,64 +221,6 @@ document.addEventListener("DOMContentLoaded", () => {
       option.textContent = username;
       cashierSelect.appendChild(option);
     });
-  }
-
-  // --- Safe Date Parser (Local-Time Aware) ---
-  function parseDateSafe(dateString) {
-    if (!dateString) return null;
-
-    // 0️⃣ Bare Excel serial number stored as a string/number (e.g. "46333.868...")
-    //    Catches dates that were corrupted by a prior import before this fix existed.
-    const serialGuess = excelSerialToDate(dateString);
-    if (serialGuess) return serialGuess;
-
-    // 1️⃣ Try built-in parser first (handles ISO)
-    let d = new Date(dateString);
-    if (!isNaN(d.getTime())) return d;
-
-    // 2️⃣ Try DD/MM/YYYY or DD-MM-YYYY (with optional time)
-    const dtMatch = dateString.match(
-      /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[ ,T]*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM|am|pm))?)?/
-    );
-    if (dtMatch) {
-      let [, day, month, year, hour, minute, second, ampm] = dtMatch;
-      day = parseInt(day, 10);
-      month = parseInt(month, 10) - 1;
-      year = parseInt(year, 10);
-      if (year < 100) year += 2000;
-
-      hour = hour ? parseInt(hour, 10) : 0;
-      minute = minute ? parseInt(minute, 10) : 0;
-      second = second ? parseInt(second, 10) : 0;
-
-      if (ampm) {
-        const up = ampm.toUpperCase();
-        if (up === "PM" && hour < 12) hour += 12;
-        if (up === "AM" && hour === 12) hour = 0;
-      }
-
-      // Create local time date
-      const localDate = new Date(year, month, day, hour, minute, second);
-      if (!isNaN(localDate.getTime())) return localDate;
-    }
-
-    // 3️⃣ Try ISO-like YYYY-MM-DD HH:MM
-    const isoParts = dateString.match(
-      /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{2}):?(\d{2})?)?/
-    );
-    if (isoParts) {
-      let [, y, m, d2, h, min, s] = isoParts;
-      y = parseInt(y, 10);
-      m = parseInt(m, 10) - 1;
-      d2 = parseInt(d2, 10);
-      h = h ? parseInt(h, 10) : 0;
-      min = min ? parseInt(min, 10) : 0;
-      s = s ? parseInt(s, 10) : 0;
-      const localDate = new Date(y, m, d2, h, min, s);
-      if (!isNaN(localDate.getTime())) return localDate;
-    }
-
-    return null;
   }
 
   // === Render Sales Table ===
@@ -703,7 +712,7 @@ function formatSaleDateForDisplay(value) {
 // export -> import no longer loses those two numbers (this was the root
 // cause of Dashboard showing RM0.00 for Subtotal/Discount/Free Value after import).
 function exportToCSV() {
-  const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+  const sales = sortSalesByDateDesc(JSON.parse(localStorage.getItem("mintcha_sales") || "[]"));
   const rows = [
     ["Order ID", "Date", "Cashier", "Customer", "Items", "Subtotal", "Total", "Payment", "Discount Type", "Discount Amount", "Status", "Refund Reason"]
   ];
@@ -738,7 +747,7 @@ function exportToCSV() {
 
 // === JSON Export Function ===
 function exportSalesToJSON() {
-  const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+  const sales = sortSalesByDateDesc(JSON.parse(localStorage.getItem("mintcha_sales") || "[]"));
   const blob = new Blob([JSON.stringify(sales, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
