@@ -7,20 +7,48 @@
 // exported file's row order didn't match what was shown on screen.
 
 // --- Safe Date Parser (Local-Time Aware) ---
+// IMPORTANT: order matters here. This app's canonical stored date format is
+// DD/MM/YYYY (en-MY locale). JavaScript's native `new Date(string)` assumes
+// MM/DD/YYYY for ambiguous slash-separated dates, so calling it first would
+// silently swap day/month for any date where BOTH parts are <=12 (e.g.
+// "12/7/2026" meaning 12 July gets misread as December 7). Dates where the
+// day is >12 happened to "work" before only because native Date() fails
+// outright on them (e.g. "26" can't be a month) and fell through to the
+// DD/MM regex below — but that's not something to depend on for every date.
+// So: try ISO (year-first, unambiguous) first, then explicitly assume
+// DD/MM/YYYY for slash/dash dates, and only fall back to the native parser
+// as an absolute last resort for anything else.
 function parseDateSafe(dateString) {
   if (!dateString) return null;
+  const str = String(dateString).trim();
 
   // 0️⃣ Bare Excel serial number stored as a string/number (e.g. "46333.868...")
   //    Catches dates that were corrupted by a prior import before this fix existed.
-  const serialGuess = excelSerialToDate(dateString);
+  const serialGuess = excelSerialToDate(str);
   if (serialGuess) return serialGuess;
 
-  // 1️⃣ Try built-in parser first (handles ISO)
-  let d = new Date(dateString);
-  if (!isNaN(d.getTime())) return d;
+  // 1️⃣ ISO-style YYYY-MM-DD (or YYYY/MM/DD), optionally with time — unambiguous
+  //    because a 4-digit year can never be confused with a day or month.
+  //    This is the format used by manual sale entry (datetime-local inputs).
+  const isoParts = str.match(
+    /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{2}):?(\d{2})?)?/
+  );
+  if (isoParts) {
+    let [, y, m, d2, h, min, s] = isoParts;
+    y = parseInt(y, 10);
+    m = parseInt(m, 10) - 1;
+    d2 = parseInt(d2, 10);
+    h = h ? parseInt(h, 10) : 0;
+    min = min ? parseInt(min, 10) : 0;
+    s = s ? parseInt(s, 10) : 0;
+    const localDate = new Date(y, m, d2, h, min, s);
+    if (!isNaN(localDate.getTime())) return localDate;
+  }
 
-  // 2️⃣ Try DD/MM/YYYY or DD-MM-YYYY (with optional time)
-  const dtMatch = dateString.match(
+  // 2️⃣ DD/MM/YYYY or DD-MM-YYYY (with optional time) — our canonical format.
+  //    Checked BEFORE the native parser so it's never overridden by a
+  //    MM/DD misinterpretation.
+  const dtMatch = str.match(
     /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[ ,T]*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM|am|pm))?)?/
   );
   if (dtMatch) {
@@ -45,21 +73,9 @@ function parseDateSafe(dateString) {
     if (!isNaN(localDate.getTime())) return localDate;
   }
 
-  // 3️⃣ Try ISO-like YYYY-MM-DD HH:MM
-  const isoParts = dateString.match(
-    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{2}):?(\d{2})?)?/
-  );
-  if (isoParts) {
-    let [, y, m, d2, h, min, s] = isoParts;
-    y = parseInt(y, 10);
-    m = parseInt(m, 10) - 1;
-    d2 = parseInt(d2, 10);
-    h = h ? parseInt(h, 10) : 0;
-    min = min ? parseInt(min, 10) : 0;
-    s = s ? parseInt(s, 10) : 0;
-    const localDate = new Date(y, m, d2, h, min, s);
-    if (!isNaN(localDate.getTime())) return localDate;
-  }
+  // 3️⃣ Last resort: native parser, for any other unusual-but-unambiguous format.
+  let d = new Date(str);
+  if (!isNaN(d.getTime())) return d;
 
   return null;
 }
@@ -694,14 +710,20 @@ function excelSerialToDate(value) {
 // raw Excel serial number) into a friendly DD/MM/YYYY HH:MM string for display.
 function formatSaleDateForDisplay(value) {
   if (!value) return "-";
+  const pad = (n) => String(n).padStart(2, "0");
+
+  // Bare Excel serial numbers were built via Date.UTC() (see excelSerialToDate),
+  // so read them back with the UTC getters — using local getters here could
+  // shift the day depending on the browser's timezone.
   const asSerial = excelSerialToDate(value);
   if (asSerial) {
-    const pad = (n) => String(n).padStart(2, "0");
     return `${pad(asSerial.getUTCDate())}/${pad(asSerial.getUTCMonth() + 1)}/${asSerial.getUTCFullYear()} ${pad(asSerial.getUTCHours())}:${pad(asSerial.getUTCMinutes())}`;
   }
-  const d = new Date(value);
-  if (!isNaN(d.getTime())) {
-    const pad = (n) => String(n).padStart(2, "0");
+
+  // Everything else goes through the shared DD/MM-first safe parser so this
+  // never falls into the same MM/DD-ambiguity bug that new Date(value) had.
+  const d = parseDateSafe(value);
+  if (d) {
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
   return String(value);
