@@ -1,3 +1,5 @@
+console.log("[dashboard.js] v2 loaded — category discount fix active");
+
 document.addEventListener("DOMContentLoaded", () => {
   const lowStockList = document.getElementById("lowStockList");
 
@@ -320,15 +322,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // === First pass: bucket this sale's actual line totals by category ===
-  // (uses the price actually sold at, i.e. item.price, so it sums to
-  // exactly sale.subtotal — using today's menu price would drift if a
-  // price was changed since this sale happened)
+  // Uses the current menu price as the reference price for splitting a sale's
+  // subtotal/discount across categories. We fall back to it (rather than only
+  // item.price) because imported sales never carry a per-item price — the
+  // XLSX "Items" column only stores qty × name, so item.price is always 0
+  // for those. Without this fallback, saleCategorySubtotal comes out as 0
+  // for every category on an imported sale, and the proportional discount
+  // split below always divides out to 0 — category boxes would show
+  // "-RM0.00 discount" even though the sale-level total is correct.
+  // (This does mean the split uses today's price, not the price actually
+  // sold at, if the menu price has since changed — acceptable since it's
+  // only used to apportion the discount, not to total up revenue.)
   const saleCategorySubtotal = {};
   (sale.items || []).forEach(item => {
     const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
     const cat = categoryTotals[meta.category] ? meta.category : "uncategorized";
     const qty = item.qty || 0;
-    const lineTotal = (item.price || 0) * qty;
+    const lineTotal = (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
 
     categoryTotals[cat].cups += qty;
     categoryTotals[cat].revenue += (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
@@ -341,9 +351,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // proportional to how much of the sale's subtotal each category made up ===
   const saleSubtotal = parseFloat(sale.subtotal || 0);
   const saleDiscount = parseFloat(sale.discountAmount || 0);
-  if (saleSubtotal > 0 && saleDiscount > 0) {
+  const saleCategorySubtotalSum = Object.values(saleCategorySubtotal).reduce((a, b) => a + b, 0);
+  if (saleCategorySubtotalSum > 0 && saleDiscount > 0) {
     Object.entries(saleCategorySubtotal).forEach(([cat, catSubtotal]) => {
-      const share = (catSubtotal / saleSubtotal) * saleDiscount;
+      const share = (catSubtotal / saleCategorySubtotalSum) * saleDiscount;
       categoryTotals[cat].discount += share;
     });
   }
