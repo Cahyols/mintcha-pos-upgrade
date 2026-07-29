@@ -445,6 +445,84 @@
         grid-template-columns: 80px 1fr 60px;
       }
     }
+
+    /* === Backup reminder banner === */
+    .backup-banner {
+      display: none; /* toggled to flex by backup.js when overdue */
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: #fff3e0;
+      border: 1px solid #ffcc80;
+      color: #8a5300;
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin: 0 1.5rem 1.25rem;
+      font-size: .88rem;
+      font-weight: 600;
+    }
+    .backup-banner .banner-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .backup-banner button {
+      padding: 6px 12px;
+      font-size: .8rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .backup-banner .primary-action {
+      background: #e65100;
+      color: #fff;
+    }
+    .backup-banner .primary-action:hover { background: #bf4300; }
+    .backup-banner .secondary-action {
+      background: #fff;
+      border: 1px solid #e0a86a;
+      color: #8a5300;
+    }
+    .backup-banner .secondary-action:hover { background: #ffe9cc; }
+
+    /* === Backup & Restore card === */
+    .backup-card-body {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    #lastBackupText {
+      font-size: .85rem;
+      color: #666;
+    }
+    .backup-card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .backup-card-actions button {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: .85rem;
+    }
+    #downloadBackupBtn {
+      background: #2e7d32;
+      color: #fff;
+    }
+    #downloadBackupBtn:hover { background: #1b5e20; }
+    #restoreBackupTriggerBtn {
+      background: #fff;
+      border: 1px solid #c62828;
+      color: #c62828;
+    }
+    #restoreBackupTriggerBtn:hover { background: #fdecec; }
   </style>
 </head>
 <body>
@@ -477,6 +555,15 @@
         <h1>Welcome to Mintcha POS</h1>
         <span class="user-badge"><span class="dot"></span>Logged in as <strong id="loggedUser"></strong></span>
       </header>
+
+      <!-- === Backup Reminder Banner (admin only, shown when overdue) === -->
+      <div id="backupReminderBanner" class="backup-banner">
+        <span>⚠️ You haven't backed up your data in a while. If this browser's data is lost, everything below is gone with it.</span>
+        <div class="banner-actions">
+          <button id="bannerDownloadBackupBtn" class="primary-action">⬇️ Backup Now</button>
+          <button id="snoozeBackupBtn" class="secondary-action">Remind me tomorrow</button>
+        </div>
+      </div>
 
       <div class="page-content">
         <!-- === Today's Summary (Admin only) === -->
@@ -515,6 +602,19 @@
             <!-- Populated by JS -->
           </ul>
         </section>
+
+        <!-- === Data Backup (Admin only) === -->
+        <section id="backupCard" class="dashboard-card" style="display:none;">
+          <h3>💾 Data Backup</h3>
+          <div class="backup-card-body">
+            <p id="lastBackupText">Last backup: —</p>
+            <div class="backup-card-actions">
+              <button id="downloadBackupBtn">⬇️ Download Backup Now</button>
+              <button id="restoreBackupTriggerBtn">⬆️ Restore from Backup</button>
+              <input type="file" id="restoreBackupInput" accept=".json" style="display:none" />
+            </div>
+          </div>
+        </section>
       </div>
     </section>
   </div>
@@ -522,6 +622,7 @@
   <!-- === Scripts === -->
   <script src="js/common.js"></script>
   <script src="js/dashboard.js"></script>
+  <script src="js/backup.js"></script>
 
   <script>
     // Show "Stock Usage" link only for admins
