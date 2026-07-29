@@ -140,6 +140,22 @@
       background: #fafafa;
     }
     .warning-card #lowStockList li:last-child { margin-bottom: 0; }
+    .warning-card #lowStockList li.stock-low {
+      background: #fff8e1;
+      border-left: 4px solid #f9a825;
+    }
+    .warning-card #lowStockList li.stock-critical {
+      background: #ffebee;
+      border-left: 4px solid #c62828;
+    }
+    .reorder-tag {
+      display: block;
+      font-size: .72rem;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .stock-low .reorder-tag { color: #e65100; }
+    .stock-critical .reorder-tag { color: #c62828; }
 
     /* === Today's Summary === */
     .summary-hero {

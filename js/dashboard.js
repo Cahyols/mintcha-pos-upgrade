@@ -1,6 +1,8 @@
-console.log("[dashboard.js] v2 loaded — category discount fix active");
+console.log("[dashboard.js] v3 loaded — reorder alerts + auth guard active");
 
 document.addEventListener("DOMContentLoaded", () => {
+  if (!requireAuth()) return;
+
   const lowStockList = document.getElementById("lowStockList");
 
   // --- Safe Date Parser (DD/MM/YYYY-first, since en-MY locale is day-first) ---
@@ -62,6 +64,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // === Low Stock / Reorder Alerts ===
+  // Sorted most-urgent-first (how far below its own threshold it's fallen,
+  // as a ratio — so a "10 cups, threshold 10" item and a "50 cups,
+  // threshold 50" item both flag at the same relative urgency, not just
+  // by raw quantity). Items at/below zero are marked OUT OF STOCK.
+  // Cup-type items get a 🥤 icon instead of ⚠️ so they stand out in a glance
+  // when you're scanning for "do I need to order more cups."
   function renderLowStockAlerts() {
     const lowStockItems = getLowStockItems();
 
@@ -70,13 +79,25 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    lowStockList.innerHTML = lowStockItems.map(item => `
-      <li>
-        <strong>${item.name}</strong> – ${item.quantity} ${item.unit}
-        ${item.conversionUnit ? ` (${item.conversionUnit})` : ""}
-        <span style="color:red;">⚠️ Low Stock</span>
-      </li>
-    `).join("");
+    const sorted = [...lowStockItems].sort((a, b) => {
+      const ratioA = a.lowThreshold > 0 ? a.quantity / a.lowThreshold : 0;
+      const ratioB = b.lowThreshold > 0 ? b.quantity / b.lowThreshold : 0;
+      return ratioA - ratioB;
+    });
+
+    lowStockList.innerHTML = sorted.map(item => {
+      const isCup = /cup/i.test(item.name) || /cup/i.test(item.unit || "");
+      const icon = isCup ? "🥤" : "⚠️";
+      const critical = item.quantity <= 0;
+
+      return `
+        <li class="${critical ? "stock-critical" : "stock-low"}">
+          <strong>${icon} ${item.name}</strong> – ${item.quantity} ${item.unit}
+          ${item.conversionUnit ? ` (${item.conversionUnit})` : ""}
+          <span class="reorder-tag">${critical ? "OUT OF STOCK — order now!" : `Below ${item.lowThreshold} — order soon`}</span>
+        </li>
+      `;
+    }).join("");
   }
 
   // ===================================================================

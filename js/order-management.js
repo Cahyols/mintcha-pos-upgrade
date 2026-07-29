@@ -552,6 +552,70 @@ function calculateDiscount(cartItems, discountLabel) {
   return discountAmount;
 }
 
+// === Stock deduction + usage logging (runs once per completed sale) ===
+//
+// How matching works: each menu item's recipe (set in Menu Recipes) lists
+// ingredients by NAME (e.g. "Noomoo Oat Milk", "Cup"). This looks for a
+// Stock Overview item with that exact same name (case/spacing-insensitive)
+// and subtracts from it. If no matching stock item exists, the usage is
+// still logged (so Stock Usage Report stays accurate) but nothing is
+// deducted — there's nothing to deduct from.
+//
+// Unit conversion: recipe quantities are assumed to be written in the same
+// units as each stock item's "Conversion Unit" (e.g. a stock item tracked
+// as "1 bottle = 1000 ml" with recipes written in ml). If a stock item has
+// a Conversion Value set, the deduction divides by it to convert ml-used
+// into bottles-used; if not set, the recipe quantity is subtracted directly
+// against the stock item's main quantity (useful for things like "Cup",
+// tracked 1-for-1 with no conversion needed).
+function deductStockForSaleAndLogUsage(cartItems) {
+  const stockList = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
+  const usageData = JSON.parse(localStorage.getItem("mintcha_usage") || "{}");
+  const todayKey = new Date().toISOString().split("T")[0];
+  if (!usageData[todayKey]) usageData[todayKey] = {};
+
+  const depletedItems = [];
+
+  cartItems.forEach(cartItem => {
+    const menuItem = sampleMenu.find(m => m.name === cartItem.name);
+    if (!menuItem || !Array.isArray(menuItem.ingredients)) return;
+
+    menuItem.ingredients.forEach(ing => {
+      const usedQty = (parseFloat(ing.qty) || 0) * cartItem.qty;
+      if (usedQty <= 0 || !ing.name) return;
+
+      // --- Log usage (always, regardless of whether stock tracks this item) ---
+      const key = ing.name.trim();
+      if (!usageData[todayKey][key]) {
+        usageData[todayKey][key] = { total: 0, unit: ing.unit || "" };
+      }
+      usageData[todayKey][key].total += usedQty;
+
+      // --- Deduct from matching stock item, if one exists ---
+      const stockItem = stockList.find(
+        s => (s.name || "").trim().toLowerCase() === key.toLowerCase()
+      );
+      if (!stockItem) return;
+
+      const conv = parseFloat(stockItem.conversionValue);
+      const deduction = conv && conv > 0 ? usedQty / conv : usedQty;
+
+      const before = parseFloat(stockItem.quantity) || 0;
+      const after = Math.max(0, before - deduction);
+      stockItem.quantity = after;
+
+      if (after <= 0 && before > 0) {
+        depletedItems.push(stockItem.name);
+      }
+    });
+  });
+
+  localStorage.setItem("mintcha_stock", JSON.stringify(stockList));
+  localStorage.setItem("mintcha_usage", JSON.stringify(usageData));
+
+  return depletedItems;
+}
+
 // === Update Cart ===
 function updateCart() {
   // An empty cart can never legitimately carry a discount. This is a safety
@@ -698,17 +762,14 @@ function generateOrderId() {
 
 // === INIT ===
 document.addEventListener("DOMContentLoaded", () => {
+  if (!requireAuth()) return;
+
   renderMenu();
   renderPriceEditorIfAdmin();
   setupMenuCategoryTabs();
   setupOrderTypeTabs();
 
   const user = localStorage.getItem("mintchaUser");
-  if (!user) {
-    alert("You must log in to access this page.");
-    window.location.href = "index.html";
-    return;
-  }
 
   const cashierDisplay = document.getElementById("currentCashier");
   if (cashierDisplay) cashierDisplay.textContent = user;
@@ -795,6 +856,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
         allSales.unshift(sale);
         localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
+
+        // === Deduct stock + log ingredient usage for this sale ===
+        // Runs from the SAME cart used to build the sale/receipt above, so
+        // "what was sold" and "what got deducted" can never drift apart —
+        // and it runs before `finally` clears `cart`, so the data is still there.
+        const depletedItems = deductStockForSaleAndLogUsage(cart);
+        if (depletedItems.length) {
+          showOrderToast(`⚠️ Now out of stock: ${depletedItems.join(", ")}`);
+        }
 
         document.getElementById("closeReceiptModal").onclick = () => {
           receiptModal.style.display = "none";
