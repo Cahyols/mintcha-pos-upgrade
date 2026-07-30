@@ -75,9 +75,6 @@ function showOrderToast(message) {
 }
 
 // === Price resolution helper ===
-// Single source of truth for "what does this item cost right now" —
-// used by rendering, add-to-cart, and nowhere else, so dine-in vs
-// delivery pricing can never drift apart between the menu grid and the cart.
 function getItemPrice(item, orderType = activeOrderType) {
   if (orderType === "delivery") {
     const dPrice = parseFloat(item.priceDelivery);
@@ -87,9 +84,6 @@ function getItemPrice(item, orderType = activeOrderType) {
 }
 
 // === Current admin mode helper ===
-// Reads which of Edit Menu / Reorder Menu is currently active (if any),
-// so other UI (order type tabs, color tagging) can re-render in the same
-// mode instead of silently kicking the admin back to plain "view".
 function getCurrentAdminMode() {
   const editBtn = document.getElementById("toggleEditPrices");
   const reorderBtn = document.getElementById("toggleReorder");
@@ -98,11 +92,92 @@ function getCurrentAdminMode() {
   return "view";
 }
 
+// === Stock availability helpers ===
+//
+// Uses the exact same name-matching + unit-conversion logic as the
+// deduction function below, so "how many can we still make" and "how much
+// gets deducted at checkout" can never disagree with each other.
+//
+// An ingredient with NO matching stock item doesn't constrain availability
+// at all (e.g. "Small Straw" may not be tracked yet) — only ingredients
+// you're actively tracking in Stock Overview can ever cause a "Sold Out".
+function getMaxMakeableFromStock(menuItem) {
+  if (!Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) {
+    return Infinity;
+  }
+
+  const stockList = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
+  let maxMakeable = Infinity;
+
+  menuItem.ingredients.forEach(ing => {
+    const perDrink = parseFloat(ing.qty) || 0;
+    if (perDrink <= 0 || !ing.name) return;
+
+    const stockItem = stockList.find(
+      s => (s.name || "").trim().toLowerCase() === ing.name.trim().toLowerCase()
+    );
+    if (!stockItem) return; // untracked ingredient — doesn't limit availability
+
+    const conv = parseFloat(stockItem.conversionValue);
+    const availableInRecipeUnits = conv && conv > 0
+      ? (parseFloat(stockItem.quantity) || 0) * conv
+      : (parseFloat(stockItem.quantity) || 0);
+
+    const makeableFromThisIngredient = Math.floor(availableInRecipeUnits / perDrink);
+    maxMakeable = Math.min(maxMakeable, makeableFromThisIngredient);
+  });
+
+  return maxMakeable; // stays Infinity if nothing tracked constrains it
+}
+
+// Subtracts what's already sitting in the current cart, so availability
+// reflects "how many MORE can be added," not just raw stock on the shelf.
+function getRemainingAvailable(menuItem) {
+  const max = getMaxMakeableFromStock(menuItem);
+  if (max === Infinity) return Infinity;
+  const inCart = cart.find(c => c.name === menuItem.name);
+  const alreadyQueued = inCart ? inCart.qty : 0;
+  return max - alreadyQueued;
+}
+
+// Walks the already-rendered "view mode" cards and toggles sold-out state
+// without rebuilding the whole grid — cheap enough to call on every cart
+// change, and avoids interrupting the "just-added" animation on a card
+// that was just clicked.
+function applyAvailabilityToRenderedMenu() {
+  if (!menuContainer) return;
+  const cards = menuContainer.querySelectorAll(".menu-item[data-index]");
+
+  cards.forEach(div => {
+    // Only "view mode" cards are click-to-add (they carry role="button");
+    // edit/reorder mode cards should stay fully interactable regardless
+    // of stock, since an admin still needs to edit/reorder sold-out drinks.
+    if (div.getAttribute("role") !== "button") return;
+
+    const idx = parseInt(div.dataset.index, 10);
+    const item = sampleMenu[idx];
+    if (!item) return;
+
+    const remaining = getRemainingAvailable(item);
+    const soldOut = remaining <= 0;
+
+    div.classList.toggle("menu-item-unavailable", soldOut);
+    div.setAttribute("aria-disabled", soldOut ? "true" : "false");
+    div.tabIndex = soldOut ? -1 : 0;
+
+    let badge = div.querySelector(".sold-out-badge");
+    if (soldOut && !badge) {
+      badge = document.createElement("span");
+      badge.className = "sold-out-badge";
+      badge.textContent = "Sold Out";
+      div.appendChild(badge);
+    } else if (!soldOut && badge) {
+      badge.remove();
+    }
+  });
+}
+
 // === Order type tabs (Dine In / Delivery) ===
-// Sits to the left of the category tabs. Selecting a type still shows
-// every category — it only changes which price is used/displayed.
-// Switching type with items already in the cart clears the cart, since
-// the two order types can have different prices for the same drink.
 function setupOrderTypeTabs() {
   if (!orderTypeTabs) return;
   orderTypeTabs.addEventListener("click", (e) => {
@@ -131,9 +206,6 @@ function setupOrderTypeTabs() {
 }
 
 // === Category filter tabs ===
-// Wired once; reads activeMenuCategoryFilter and re-renders in "view" mode.
-// Admin edit/reorder modes intentionally keep showing the full menu
-// (filtering while editing/reordering would make items seem to "vanish").
 function setupMenuCategoryTabs() {
   if (!menuCatTabs) return;
   menuCatTabs.addEventListener("click", (e) => {
@@ -147,8 +219,6 @@ function setupMenuCategoryTabs() {
 }
 
 // === Render Menu Items ===
-// mode: "view" (default, click-to-add) | "editPrices" | "reorder"
-// Legacy callers pass a boolean (true = editPrices, false/undefined = view) — normalized below.
 function renderMenu(mode = "view") {
   if (mode === true) mode = "editPrices";
   if (mode === false || mode == null) mode = "view";
@@ -161,8 +231,6 @@ function renderMenu(mode = "view") {
     return;
   }
 
-  // Category filter only applies in normal "view" mode. Editing/reordering
-  // always show everything so nothing appears to disappear mid-edit.
   const visibleEntries = sampleMenu
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => {
@@ -188,7 +256,6 @@ function renderMenu(mode = "view") {
     div.dataset.index = index;
     div.title = item.name;
 
-    // Apply saved color tag, if any
     if (item.color) {
       div.style.backgroundColor = item.color;
     }
@@ -235,8 +302,15 @@ function renderMenu(mode = "view") {
       div.tabIndex = 0;
       div.setAttribute("role", "button");
       div.setAttribute("aria-label", `Add ${item.name}, RM${price.toFixed(2)}, to cart`);
-      div.onclick = () => addToCart(index, div);
+      div.onclick = () => {
+        if (div.classList.contains("menu-item-unavailable")) {
+          showOrderToast(`${item.name} is sold out — not enough stock`);
+          return;
+        }
+        addToCart(index, div);
+      };
       div.onkeydown = (e) => {
+        if (div.classList.contains("menu-item-unavailable")) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           addToCart(index, div);
@@ -244,17 +318,17 @@ function renderMenu(mode = "view") {
       };
     }
 
-    // Color tag button available in every mode — small dot in the corner
     attachColorPicker(div, index);
 
     menuContainer.appendChild(div);
   });
+
+  // Gray out / disable any card that's actually sold out, right after building
+  // the grid (only affects "view" mode cards — see the role="button" check inside).
+  applyAvailabilityToRenderedMenu();
 }
 
 // === Color tag picker ===
-// Adds a small colored dot button to a menu card. Clicking it opens a
-// popover of 5 preset swatches (+ "Clear") so any user can manually tag
-// a card's color — purely visual, doesn't touch price/order data.
 function attachColorPicker(div, index) {
   const dot = document.createElement("button");
   dot.type = "button";
@@ -267,10 +341,9 @@ function attachColorPicker(div, index) {
   if (!item.color) dot.classList.add("color-dot-empty");
 
   dot.addEventListener("click", (e) => {
-    e.stopPropagation(); // don't trigger addToCart on the card behind it
+    e.stopPropagation();
     e.preventDefault();
 
-    // Close any other open popover first
     document.querySelectorAll(".color-swatch-popover").forEach(p => p.remove());
 
     const popover = document.createElement("div");
@@ -290,7 +363,6 @@ function attachColorPicker(div, index) {
       popover.appendChild(swatch);
     });
 
-    // "Clear" option to remove the tag
     const clearBtn = document.createElement("button");
     clearBtn.type = "button";
     clearBtn.className = "color-swatch color-swatch-clear";
@@ -305,7 +377,6 @@ function attachColorPicker(div, index) {
 
     div.appendChild(popover);
 
-    // Close popover if clicking anywhere else on the page
     const closeOnOutsideClick = (ev) => {
       if (!popover.contains(ev.target) && ev.target !== dot) {
         popover.remove();
@@ -327,17 +398,11 @@ function setCardColor(index, colorValue) {
   }
   localStorage.setItem("menuItems", JSON.stringify(sampleMenu));
 
-  // Re-render in whatever mode is currently active, so admin edit/reorder
-  // modes keep working after a color change
   renderMenu(getCurrentAdminMode());
   showOrderToast(colorValue ? "Card color updated" : "Card color cleared");
 }
 
 // === Drag & Drop reorder handlers ===
-// Attaches HTML5 drag events to a single menu-item div so it can be
-// dragged onto another item to swap its position in sampleMenu.
-// Note: native HTML5 drag & drop does not fire on touch devices
-// (tablets/phones) — this works with mouse/trackpad input.
 function attachDragHandlers(div, index) {
   div.addEventListener("dragstart", (e) => {
     dragSrcIndex = index;
@@ -380,8 +445,6 @@ function attachDragHandlers(div, index) {
 }
 
 // === Render Admin Controls (Edit Prices + Reorder Menu) ===
-// The two modes are mutually exclusive: entering one disables the other's
-// button so an admin can't edit prices mid-drag or vice versa.
 function renderPriceEditorIfAdmin() {
   const role = localStorage.getItem("mintchaRole");
   if (role !== "admin") return;
@@ -401,7 +464,6 @@ function renderPriceEditorIfAdmin() {
       const deliveryPriceInputs = document.querySelectorAll(".price-input-delivery");
       const nameInputs = document.querySelectorAll(".name-input");
 
-      // Validate names first — don't allow saving a blank name
       for (const input of nameInputs) {
         if (!input.value.trim()) {
           alert("Item name can't be empty.");
@@ -409,7 +471,7 @@ function renderPriceEditorIfAdmin() {
         }
       }
 
-      const renames = []; // { oldName, newName } — for cascading elsewhere if needed
+      const renames = [];
 
       nameInputs.forEach((input) => {
         const idx = input.dataset.index;
@@ -468,10 +530,14 @@ function renderPriceEditorIfAdmin() {
 // === Cart Functions ===
 function addToCart(index, cardEl) {
   const selected = sampleMenu[index];
+
+  if (getRemainingAvailable(selected) <= 0) {
+    showOrderToast(`${selected.name} is sold out — not enough stock`);
+    applyAvailabilityToRenderedMenu();
+    return;
+  }
+
   const price = getItemPrice(selected);
-  // Same drink bought under different order types is kept as separate cart
-  // lines automatically, since switching order type clears the cart —
-  // matching by name alone stays safe.
   const existing = cart.find(i => i.name === selected.name);
   if (existing) {
     existing.qty++;
@@ -482,7 +548,7 @@ function addToCart(index, cardEl) {
 
   if (cardEl) {
     cardEl.classList.remove("just-added");
-    void cardEl.offsetWidth; // restart animation if clicked again quickly
+    void cardEl.offsetWidth;
     cardEl.classList.add("just-added");
   }
   showOrderToast(`${selected.name} added to cart`);
@@ -494,6 +560,12 @@ function removeFromCart(index) {
 }
 
 function increaseQty(index) {
+  const item = cart[index];
+  const menuItem = sampleMenu.find(m => m.name === item.name);
+  if (menuItem && getRemainingAvailable(menuItem) <= 0) {
+    showOrderToast(`No more ${item.name} available — out of stock`);
+    return;
+  }
   cart[index].qty++;
   updateCart();
 }
@@ -508,9 +580,6 @@ function decreaseQty(index) {
 }
 
 // === Discount Calculation (single source of truth) ===
-// Returns the discount amount (RM) for a given cart + discount label.
-// Used by both the live cart preview (updateCart) and the payment/receipt flow,
-// so the two can never drift out of sync.
 function calculateDiscount(cartItems, discountLabel) {
   const subtotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
   const totalQty = cartItems.reduce((sum, i) => sum + i.qty, 0);
@@ -529,8 +598,6 @@ function calculateDiscount(cartItems, discountLabel) {
       break;
     case "Buy 2 Free 1":
       if (totalQty >= 3) {
-        // Give away the cheapest eligible units for free, one per 3 items bought,
-        // without discounting more units of a line than it actually has.
         const freeCount = Math.floor(totalQty / 3);
         const expanded = [];
         cartItems.forEach(item => {
@@ -543,7 +610,7 @@ function calculateDiscount(cartItems, discountLabel) {
       }
       break;
       case "Free":
-      discountAmount = subtotal; // 100% off — whole order becomes RM0.00
+      discountAmount = subtotal;
       break;
   }
 
@@ -553,21 +620,6 @@ function calculateDiscount(cartItems, discountLabel) {
 }
 
 // === Stock deduction + usage logging (runs once per completed sale) ===
-//
-// How matching works: each menu item's recipe (set in Menu Recipes) lists
-// ingredients by NAME (e.g. "Noomoo Oat Milk", "Cup"). This looks for a
-// Stock Overview item with that exact same name (case/spacing-insensitive)
-// and subtracts from it. If no matching stock item exists, the usage is
-// still logged (so Stock Usage Report stays accurate) but nothing is
-// deducted — there's nothing to deduct from.
-//
-// Unit conversion: recipe quantities are assumed to be written in the same
-// units as each stock item's "Conversion Unit" (e.g. a stock item tracked
-// as "1 bottle = 1000 ml" with recipes written in ml). If a stock item has
-// a Conversion Value set, the deduction divides by it to convert ml-used
-// into bottles-used; if not set, the recipe quantity is subtracted directly
-// against the stock item's main quantity (useful for things like "Cup",
-// tracked 1-for-1 with no conversion needed).
 function deductStockForSaleAndLogUsage(cartItems) {
   const stockList = JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
   const usageData = JSON.parse(localStorage.getItem("mintcha_usage") || "{}");
@@ -584,14 +636,12 @@ function deductStockForSaleAndLogUsage(cartItems) {
       const usedQty = (parseFloat(ing.qty) || 0) * cartItem.qty;
       if (usedQty <= 0 || !ing.name) return;
 
-      // --- Log usage (always, regardless of whether stock tracks this item) ---
       const key = ing.name.trim();
       if (!usageData[todayKey][key]) {
         usageData[todayKey][key] = { total: 0, unit: ing.unit || "" };
       }
       usageData[todayKey][key].total += usedQty;
 
-      // --- Deduct from matching stock item, if one exists ---
       const stockItem = stockList.find(
         s => (s.name || "").trim().toLowerCase() === key.toLowerCase()
       );
@@ -618,10 +668,6 @@ function deductStockForSaleAndLogUsage(cartItems) {
 
 // === Update Cart ===
 function updateCart() {
-  // An empty cart can never legitimately carry a discount. This is a safety
-  // net so a stray failure elsewhere (e.g. an error thrown before
-  // resetDiscount() runs during checkout) can never leave a "phantom"
-  // discount showing on an empty cart.
   if (!cart.length && appliedDiscount) {
     appliedDiscount = null;
   }
@@ -668,18 +714,17 @@ function updateCart() {
     discountLabelEl.textContent = appliedDiscount;
     summaryDiscount.textContent = `-RM${discountAmount.toFixed(2)}`;
     summaryDiscountRow.classList.remove("hidden");
-    // Inline style wins any specificity tie against ".hidden" vs
-    // ".cart-summary-row" in the page's own <style> block, so this can
-    // never be visually overridden by the cascade.
     summaryDiscountRow.style.display = "flex";
   } else {
     summaryDiscountRow.classList.add("hidden");
     summaryDiscountRow.style.display = "none";
-    // Also clear the stale text so nothing lingers if this row is ever
-    // shown again by a future bug.
     summaryDiscount.textContent = "-RM0.00";
     discountLabelEl.textContent = "";
   }
+
+  // Cart quantities affect "how much MORE stock is left" — re-check every
+  // rendered card's sold-out state whenever the cart changes.
+  applyAvailabilityToRenderedMenu();
 }
 
 // === Discount Modal Handling ===
@@ -736,8 +781,6 @@ removeDiscountBtn?.addEventListener("click", () => {
 });
 
 // === Cancel Order ===
-// Guarded with a confirmation since this is a destructive, one-click action
-// sitting right next to "Proceed to Payment".
 cancelOrder?.addEventListener("click", () => {
   if (!cart.length) return;
   if (!confirm("Clear this order? This can't be undone.")) return;
@@ -789,10 +832,6 @@ document.addEventListener("DOMContentLoaded", () => {
     button.addEventListener("click", () => {
       const method = button.dataset.method;
 
-      // Wrapped in try/finally: if anything below throws (bad localStorage
-      // data, quota errors, etc.), the cart and discount still get cleared
-      // in the `finally` block so a failed save can never leave a stale
-      // discount/cart stuck on screen for the next order.
       try {
         const customer = document.getElementById("customerName").value || "Walk-in";
         const note = document.getElementById("orderNote").value;
@@ -804,13 +843,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const cashier = localStorage.getItem("mintchaUser") || "Unknown";
         const orderTypeLabel = activeOrderType === "delivery" ? "Delivery" : "Dine In";
 
-        // Totals — calculated via the shared calculateDiscount() function so the
-        // receipt/sale total always matches what was shown in the cart preview.
         let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
         const discountAmount = calculateDiscount(cart, appliedDiscount);
         const total = subtotal - discountAmount;
 
-        // Receipt
         const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
         receiptContent.innerHTML = `
           <div class="receipt-brand">🍃 Mintcha</div>
@@ -836,7 +872,6 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         `;
 
-        // Save sale
         const sale = {
           id: orderId,
           date: dateStr,
@@ -858,13 +893,14 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
 
         // === Deduct stock + log ingredient usage for this sale ===
-        // Runs from the SAME cart used to build the sale/receipt above, so
-        // "what was sold" and "what got deducted" can never drift apart —
-        // and it runs before `finally` clears `cart`, so the data is still there.
         const depletedItems = deductStockForSaleAndLogUsage(cart);
         if (depletedItems.length) {
           showOrderToast(`⚠️ Now out of stock: ${depletedItems.join(", ")}`);
         }
+
+        // Re-render the menu grid immediately so sold-out cards reflect the
+        // post-sale stock levels for the next order.
+        renderMenu(getCurrentAdminMode());
 
         document.getElementById("closeReceiptModal").onclick = () => {
           receiptModal.style.display = "none";
@@ -875,8 +911,6 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Payment/save failed:", err);
         showOrderToast("Something went wrong saving the order");
       } finally {
-        // Always runs, whether the sale saved successfully or not — this is
-        // what guarantees the discount can never survive past checkout.
         cart = [];
         resetDiscount();
         updateCart();

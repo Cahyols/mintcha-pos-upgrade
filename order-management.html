@@ -92,10 +92,6 @@
     }
 
     /* === Order type tabs (Dine In / Delivery) === */
-    /* Now lives inside .menu-toolbar-row alongside Edit Menu/Reorder Menu,
-       so its own bottom margin is handled by the row instead. Selecting a
-       type still shows every category — it only changes which price is
-       shown/charged, since dine-in and delivery prices differ. */
     .order-type-tabs {
       display: flex;
       gap: 8px;
@@ -126,9 +122,6 @@
     .menu-main { flex: 1 1 auto; min-width: 0; }
 
     /* === Category filter tabs (vertical sidebar to the left of the grid) === */
-    /* Minimal nav-list style: no pill background, just a left accent bar
-       and color shift on the active item. Reads as a filter list rather
-       than a row of buttons. */
     .menu-cat-tabs {
       display: flex;
       flex-direction: column;
@@ -274,6 +267,43 @@
       0% { transform: scale(1); }
       40% { transform: scale(.96); box-shadow: 0 0 0 3px #009688; }
       100% { transform: scale(1); }
+    }
+
+    /* === Sold-out / unavailable menu cards ===
+       Applied when live stock can't cover even 1 more of this drink.
+       Grayed out, crossed-out name, blocked cursor, unclickable (JS also
+       blocks the click/keydown handlers — this is the visual half). */
+    .menu-item.menu-item-unavailable {
+      filter: grayscale(85%);
+      opacity: .55;
+      cursor: not-allowed;
+      pointer-events: none; /* belt-and-suspenders alongside the JS guard */
+    }
+    .menu-item.menu-item-unavailable:hover {
+      transform: none;
+      box-shadow: none;
+    }
+    .menu-item.menu-item-unavailable strong {
+      text-decoration: line-through;
+      text-decoration-color: #c62828;
+      text-decoration-thickness: 2px;
+    }
+    .menu-item.menu-item-unavailable .color-dot-btn {
+      pointer-events: none; /* don't let the color picker open on a disabled card */
+    }
+    .sold-out-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: #c62828;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 999px;
+      z-index: 1;
     }
 
     /* === Cart line items: same look as before, just clearer + bigger touch targets === */
@@ -499,24 +529,6 @@
       if (event.key === 'menuItems') {
         renderMenu(); // re-render menu when localStorage menuItems changes
       }
-    });
-
-    // === Initial render and admin controls ===
-    document.addEventListener("DOMContentLoaded", () => {
-      renderMenu();
-      renderPriceEditorIfAdmin();
-
-      const user = localStorage.getItem("mintchaUser");
-      if (!user) {
-        alert("You must log in to access this page.");
-        window.location.href = "index.html";
-        return;
-      }
-
-      const cashierDisplay = document.getElementById("currentCashier");
-      if (cashierDisplay) cashierDisplay.textContent = user;
-
-      updateCart();
     });
   </script>
 
