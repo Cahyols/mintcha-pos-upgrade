@@ -333,6 +333,30 @@
   font-weight: 700;
   color: #333;
 }
+/* === Add-on rows inside the drink breakdown (e.g. "+matcha", "+milk") ===
+   These stay visible so you can see what add-ons sold, but are visually
+   dimmed and tagged so it's clear they aren't a drink on their own and
+   are NOT part of the cup/transaction counts above. */
+.cat-drink-row.cat-drink-addon {
+  color: #999;
+  font-style: italic;
+}
+.cat-drink-row.cat-drink-addon .cat-drink-qty {
+  color: #999;
+  font-weight: 600;
+}
+.addon-tag {
+  font-size: .62rem;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  color: #aaa;
+  background: #f2f2f2;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
     .category-cups { font-size: 1.4rem; font-weight: 800; margin-top: 2px; }
     .category-sub { font-size: .72rem; color: #777; }
 

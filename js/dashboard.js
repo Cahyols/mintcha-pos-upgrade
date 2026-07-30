@@ -39,6 +39,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
+  // === Add-on detection ===
+  // Add-on items (e.g. "+matcha", "+milk", "+syrup") are stored as their own
+  // line in sale.items so pricing/inventory logic can find them, but they are
+  // NOT a drink on their own. They should still be LISTED under their
+  // category's drink breakdown (so you can see what add-ons sold), but they
+  // must never be counted as a "cup" / transaction — otherwise a single
+  // 1-cup order with 1 add-on shows up as "2" in Total Transaction.
+  function isAddOn(name) {
+    return typeof name === "string" && name.trim().startsWith("+");
+  }
+
   // Load stock from localStorage
   function loadStock() {
     return JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
@@ -147,7 +158,11 @@ document.addEventListener("DOMContentLoaded", () => {
     return start.toLocaleDateString("en-MY", { month: "long", year: "numeric" });
   }
 
-  // Renders the small "drink · qty" rows inside a category box
+  // Renders the small "drink · qty" rows inside a category box.
+  // NOTE: this still receives add-on entries (e.g. "+matcha") so they remain
+  // visible in the breakdown — they're just excluded from the cup COUNTS
+  // upstream (see renderSummaryForRange). Add-on rows get a subtle "add-on"
+  // tag so it's clear at a glance they aren't a drink on their own.
   function renderCategoryDrinksList(drinksMap) {
     const entries = Object.entries(drinksMap).sort((a, b) => b[1] - a[1]);
     if (!entries.length) return "";
@@ -155,8 +170,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return `
       <div class="cat-drink-list">
         ${entries.map(([name, qty]) => `
-          <div class="cat-drink-row">
-            <span class="cat-drink-name">${name}</span>
+          <div class="cat-drink-row${isAddOn(name) ? " cat-drink-addon" : ""}">
+            <span class="cat-drink-name">${name}${isAddOn(name) ? ` <span class="addon-tag">add-on</span>` : ""}</span>
             <span class="cat-drink-qty">${qty}</span>
           </div>
         `).join("")}
@@ -223,6 +238,11 @@ document.addEventListener("DOMContentLoaded", () => {
       bucket.discount += parseFloat(sale.discountAmount || 0);
 
       (sale.items || []).forEach(item => {
+        // Add-ons aren't a cup — don't count them toward the 🥤 cup tally
+        // or the per-category cup counts, even though they're still a
+        // valid line item on the sale.
+        if (isAddOn(item.name)) return;
+
         const qty = item.qty || 0;
         bucket.cups += qty;
 
@@ -331,7 +351,12 @@ document.addEventListener("DOMContentLoaded", () => {
   totalRevenue += parseFloat(sale.total || 0);
   totalSubtotal += parseFloat(sale.subtotal || 0);
   totalDiscountAmount += parseFloat(sale.discountAmount || 0);
-  const cupsInSale = (sale.items || []).reduce((sum, i) => sum + (i.qty || 0), 0);
+  // Add-ons (e.g. "+matcha", "+milk") are excluded from the cup count for
+  // this sale — a 1-cup order with an add-on is still 1 cup, not 2.
+  const cupsInSale = (sale.items || []).reduce((sum, i) => {
+    if (isAddOn(i.name)) return sum;
+    return sum + (i.qty || 0);
+  }, 0);
 
   if (sale.discountType === "Free") {
     freeCups += cupsInSale;
@@ -361,7 +386,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const qty = item.qty || 0;
     const lineTotal = (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
 
-    categoryTotals[cat].cups += qty;
+    // Add-ons still count toward revenue and still get LISTED in the
+    // category's drink breakdown (so "+matcha" shows up under Matcha),
+    // but they must NOT add to the "cups" count — that's what drives
+    // Total Transaction / Full-Price / Discounted / Free upstream.
+    if (!isAddOn(item.name)) {
+      categoryTotals[cat].cups += qty;
+    }
     categoryTotals[cat].revenue += (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
     categoryTotals[cat].drinks[item.name] = (categoryTotals[cat].drinks[item.name] || 0) + qty;
 
