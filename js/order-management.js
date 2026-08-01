@@ -17,6 +17,12 @@ let activeMenuCategoryFilter = "matcha";
 // it falls back to the dine-in price so old menu data keeps working.
 let activeOrderType = "dineIn"; // "dineIn" | "delivery"
 
+// === Cash payment state ===
+// Amount tendered builds up as the cashier taps denomination buttons
+// (or types a custom amount via "Others"), same as a physical cash
+// drawer workflow — not typed as one lump number.
+let cashAmountReceived = 0;
+
 // === Menu card color tagging ===
 // 5 preset colors only, kept simple — no custom color picker needed.
 const CARD_COLORS = [
@@ -55,6 +61,21 @@ const discountModal = document.getElementById("discountModal");
 const closeDiscountModal = document.getElementById("closeDiscountModal");
 const discountOptions = document.querySelectorAll(".discount-option");
 const removeDiscountBtn = document.getElementById("removeDiscountBtn");
+
+// === Cash Payment Modal elements ===
+const cashPaymentModal = document.getElementById("cashPaymentModal");
+const closeCashModal = document.getElementById("closeCashModal");
+const cashTotalDue = document.getElementById("cashTotalDue");
+const cashDenoms = document.getElementById("cashDenoms");
+const cashOthersInput = document.getElementById("cashOthersInput");
+const cashOthersAddBtn = document.getElementById("cashOthersAddBtn");
+const cashExactBtn = document.getElementById("cashExactBtn");
+const cashReceivedDisplay = document.getElementById("cashReceivedDisplay");
+const cashBalanceRow = document.getElementById("cashBalanceRow");
+const cashBalanceLabel = document.getElementById("cashBalanceLabel");
+const cashBalanceDisplay = document.getElementById("cashBalanceDisplay");
+const cashClearBtn = document.getElementById("cashClearBtn");
+const cashConfirmBtn = document.getElementById("cashConfirmBtn");
 
 // === Toast feedback, reusing the site's existing .toast/.show CSS component ===
 // Named showOrderToast (not showToast) to avoid colliding with anything
@@ -803,6 +824,109 @@ function generateOrderId() {
   return `ORD-${String(currentNumber).padStart(4, "0")}`;
 }
 
+// === Current order total helper (subtotal - discount) ===
+// Shared by the payment modal and the cash modal so both always agree on
+// what's actually owed, using the exact same discount logic as the cart.
+function getCurrentOrderTotal() {
+  const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const discountAmount = calculateDiscount(cart, appliedDiscount);
+  return Math.max(0, subtotal - discountAmount);
+}
+
+// === Cash Payment Modal ===
+// Denomination buttons ADD to the running "amount received" (like counting
+// notes onto a drawer), rather than replacing it — so a cashier can tap
+// RM50 + RM20 + RM5 to build up RM75 tendered. "Others" lets them add any
+// non-standard amount (coins, odd notes). "Exact" is a shortcut for when
+// the customer pays the precise total with no change needed.
+function updateCashModalDisplay() {
+  const total = getCurrentOrderTotal();
+  const balance = cashAmountReceived - total;
+
+  cashReceivedDisplay.textContent = `RM${cashAmountReceived.toFixed(2)}`;
+
+  if (cashAmountReceived <= 0) {
+    cashBalanceRow.classList.remove("insufficient", "has-change");
+    cashBalanceLabel.textContent = "Balance";
+    cashBalanceDisplay.textContent = `RM${total.toFixed(2)}`;
+    cashConfirmBtn.disabled = true;
+  } else if (balance < 0) {
+    cashBalanceRow.classList.add("insufficient");
+    cashBalanceRow.classList.remove("has-change");
+    cashBalanceLabel.textContent = "Still Owing";
+    cashBalanceDisplay.textContent = `RM${Math.abs(balance).toFixed(2)}`;
+    cashConfirmBtn.disabled = true;
+  } else {
+    cashBalanceRow.classList.remove("insufficient");
+    cashBalanceRow.classList.add("has-change");
+    cashBalanceLabel.textContent = "Change Due";
+    cashBalanceDisplay.textContent = `RM${balance.toFixed(2)}`;
+    cashConfirmBtn.disabled = false;
+  }
+}
+
+function openCashModal() {
+  cashAmountReceived = 0;
+  cashOthersInput.value = "";
+  cashTotalDue.textContent = `RM${getCurrentOrderTotal().toFixed(2)}`;
+  updateCashModalDisplay();
+  paymentModal.style.display = "none";
+  cashPaymentModal.style.display = "flex";
+}
+
+function closeCashPaymentModal() {
+  cashPaymentModal.style.display = "none";
+  cashAmountReceived = 0;
+}
+
+cashDenoms?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".cash-denom-btn");
+  if (!btn) return;
+  cashAmountReceived += parseFloat(btn.dataset.amount) || 0;
+  updateCashModalDisplay();
+});
+
+cashOthersAddBtn?.addEventListener("click", () => {
+  const val = parseFloat(cashOthersInput.value);
+  if (isNaN(val) || val <= 0) {
+    showOrderToast("Enter a valid amount first");
+    return;
+  }
+  cashAmountReceived += val;
+  cashOthersInput.value = "";
+  updateCashModalDisplay();
+});
+
+cashOthersInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    cashOthersAddBtn.click();
+  }
+});
+
+cashExactBtn?.addEventListener("click", () => {
+  cashAmountReceived = getCurrentOrderTotal();
+  updateCashModalDisplay();
+});
+
+cashClearBtn?.addEventListener("click", () => {
+  cashAmountReceived = 0;
+  updateCashModalDisplay();
+});
+
+closeCashModal?.addEventListener("click", () => {
+  closeCashPaymentModal();
+});
+
+cashConfirmBtn?.addEventListener("click", () => {
+  const total = getCurrentOrderTotal();
+  if (cashAmountReceived < total) return; // guarded by disabled state too
+
+  const change = cashAmountReceived - total;
+  finalizeSale("Cash", { received: cashAmountReceived, change });
+  closeCashPaymentModal();
+});
+
 // === INIT ===
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireAuth()) return;
@@ -828,96 +952,120 @@ document.addEventListener("DOMContentLoaded", () => {
     paymentModal.style.display = "none";
   });
 
+  // === Finalize a sale for any payment method ===
+  // cashInfo (only for Cash) is { received, change } and gets stamped onto
+  // the sale record + shown on the receipt so cashiers have a record of
+  // what was tendered and how much change was given.
+  function finalizeSale(method, cashInfo = null) {
+    try {
+      const customer = document.getElementById("customerName").value || "Walk-in";
+      const note = document.getElementById("orderNote").value;
+      const orderId = generateOrderId();
+      const now = new Date();
+      const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+      const dateStr = now.toLocaleString("en-MY", options);
+
+      const cashier = localStorage.getItem("mintchaUser") || "Unknown";
+      const orderTypeLabel = activeOrderType === "delivery" ? "Delivery" : "Dine In";
+
+      let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+      const discountAmount = calculateDiscount(cart, appliedDiscount);
+      const total = subtotal - discountAmount;
+
+      const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
+
+      const cashReceiptBlock = cashInfo ? `
+            <div><strong>Cash Received:</strong> RM${cashInfo.received.toFixed(2)}</div>
+            <div><strong>Change Given:</strong> RM${cashInfo.change.toFixed(2)}</div>
+      ` : "";
+
+      receiptContent.innerHTML = `
+        <div class="receipt-brand">🍃 Mintcha</div>
+        <div class="receipt-header">
+          <div><strong>${dateStr}</strong></div>
+          <div>Order ID: ${orderId}</div>
+          <div>Order Type: ${orderTypeLabel}</div>
+          <div>Cashier: ${cashier}</div>
+        </div>
+        <div class="receipt-body">
+          ${itemList}
+          <div><em>Note:</em> ${note || '-'}</div>
+          <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
+          <div><strong>Payment:</strong> ${method}</div>
+        </div>
+        <div class="receipt-footer">
+          <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
+          <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
+          <strong>Total:</strong> RM${total.toFixed(2)}<br>
+          ${cashReceiptBlock}
+          <div class="receipt-barcode"></div>
+          <div>#TeamRumput VS #TeamMint 💚</div>
+          <button id="closeReceiptModal">OK</button>
+        </div>
+      `;
+
+      const sale = {
+        id: orderId,
+        date: dateStr,
+        cashier,
+        customer,
+        note,
+        orderType: orderTypeLabel,
+        items: [...cart],
+        paymentMethod: method,
+        subtotal,
+        discountType: appliedDiscount || "None",
+        discountAmount,
+        total,
+        status: "Pending",
+        // Only present for Cash payments — omitted entirely for QR/eWallet/Card
+        ...(cashInfo ? { cashReceived: cashInfo.received, changeGiven: cashInfo.change } : {})
+      };
+
+      const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+      allSales.unshift(sale);
+      localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
+
+      // === Deduct stock + log ingredient usage for this sale ===
+      const depletedItems = deductStockForSaleAndLogUsage(cart);
+      if (depletedItems.length) {
+        showOrderToast(`⚠️ Now out of stock: ${depletedItems.join(", ")}`);
+      }
+
+      // Re-render the menu grid immediately so sold-out cards reflect the
+      // post-sale stock levels for the next order.
+      renderMenu(getCurrentAdminMode());
+
+      document.getElementById("closeReceiptModal").onclick = () => {
+        receiptModal.style.display = "none";
+      };
+
+      receiptModal.style.display = "flex";
+    } catch (err) {
+      console.error("Payment/save failed:", err);
+      showOrderToast("Something went wrong saving the order");
+    } finally {
+      cart = [];
+      resetDiscount();
+      updateCart();
+      document.getElementById("customerName").value = "";
+      document.getElementById("orderNote").value = "";
+      paymentModal.style.display = "none";
+    }
+  }
+
   paymentButtons.forEach(button => {
     button.addEventListener("click", () => {
       const method = button.dataset.method;
 
-      try {
-        const customer = document.getElementById("customerName").value || "Walk-in";
-        const note = document.getElementById("orderNote").value;
-        const orderId = generateOrderId();
-        const now = new Date();
-        const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
-        const dateStr = now.toLocaleString("en-MY", options);
-
-        const cashier = localStorage.getItem("mintchaUser") || "Unknown";
-        const orderTypeLabel = activeOrderType === "delivery" ? "Delivery" : "Dine In";
-
-        let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-        const discountAmount = calculateDiscount(cart, appliedDiscount);
-        const total = subtotal - discountAmount;
-
-        const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
-        receiptContent.innerHTML = `
-          <div class="receipt-brand">🍃 Mintcha</div>
-          <div class="receipt-header">
-            <div><strong>${dateStr}</strong></div>
-            <div>Order ID: ${orderId}</div>
-            <div>Order Type: ${orderTypeLabel}</div>
-            <div>Cashier: ${cashier}</div>
-          </div>
-          <div class="receipt-body">
-            ${itemList}
-            <div><em>Note:</em> ${note || '-'}</div>
-            <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
-            <div><strong>Payment:</strong> ${method}</div>
-          </div>
-          <div class="receipt-footer">
-            <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
-            <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
-            <strong>Total:</strong> RM${total.toFixed(2)}<br>
-            <div class="receipt-barcode"></div>
-            <div>#TeamRumput VS #TeamMint 💚</div>
-            <button id="closeReceiptModal">OK</button>
-          </div>
-        `;
-
-        const sale = {
-          id: orderId,
-          date: dateStr,
-          cashier,
-          customer,
-          note,
-          orderType: orderTypeLabel,
-          items: [...cart],
-          paymentMethod: method,
-          subtotal,
-          discountType: appliedDiscount || "None",
-          discountAmount,
-          total,
-          status: "Pending"
-        };
-
-        const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
-        allSales.unshift(sale);
-        localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
-
-        // === Deduct stock + log ingredient usage for this sale ===
-        const depletedItems = deductStockForSaleAndLogUsage(cart);
-        if (depletedItems.length) {
-          showOrderToast(`⚠️ Now out of stock: ${depletedItems.join(", ")}`);
-        }
-
-        // Re-render the menu grid immediately so sold-out cards reflect the
-        // post-sale stock levels for the next order.
-        renderMenu(getCurrentAdminMode());
-
-        document.getElementById("closeReceiptModal").onclick = () => {
-          receiptModal.style.display = "none";
-        };
-
-        receiptModal.style.display = "flex";
-      } catch (err) {
-        console.error("Payment/save failed:", err);
-        showOrderToast("Something went wrong saving the order");
-      } finally {
-        cart = [];
-        resetDiscount();
-        updateCart();
-        document.getElementById("customerName").value = "";
-        document.getElementById("orderNote").value = "";
-        paymentModal.style.display = "none";
+      // Cash needs the denomination/change modal first — it finalizes the
+      // sale itself (via finalizeSale) once "Confirm Payment" is tapped.
+      if (method === "Cash") {
+        openCashModal();
+        return;
       }
+
+      finalizeSale(method);
     });
   });
 });

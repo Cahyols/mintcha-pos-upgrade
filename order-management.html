@@ -361,6 +361,142 @@
        in style.css (only .empty-menu was) — filling that gap here. */
     .empty-state { text-align: center; padding: 20px; color: #888; font-style: italic; }
 
+    /* =========================================================
+       === Cash Payment Modal ===
+       Denomination buttons, "Others" custom amount, and a live
+       balance/change display. Palette matches the rest of the page
+       (teal = fine/positive, red = insufficient).
+       ========================================================= */
+    .cash-modal-content { max-width: 380px; }
+
+    .cash-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      background: #e0f2f1;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+    }
+    .cash-total-row span:first-child {
+      font-size: .8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      color: #00796b;
+    }
+    .cash-total-row span:last-child {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #00796b;
+    }
+
+    .cash-denoms {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .cash-denom-btn {
+      padding: 12px 6px;
+      border-radius: 10px;
+      border: 1.5px solid #ddd;
+      background: #fafafa;
+      color: #333;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .12s ease, border-color .12s ease, transform .08s ease;
+    }
+    .cash-denom-btn:hover { border-color: #00897b; color: #00796b; background: #f2f9f8; }
+    .cash-denom-btn:active { transform: scale(.96); }
+
+    .cash-others-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .cash-others-row input {
+      padding: 9px 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: .9rem;
+      min-width: 0;
+    }
+    .cash-others-row button {
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1.5px solid #00897b;
+      background: #fff;
+      color: #00796b;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .cash-others-row button:hover { background: #e0f2f1; }
+
+    .cash-received-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 2px;
+      font-size: .92rem;
+      color: #555;
+      border-top: 1px dashed #ddd;
+    }
+    .cash-received-row span:last-child { font-weight: 700; color: #333; }
+
+    .cash-balance-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin: 6px 0 16px;
+      font-size: 1rem;
+      font-weight: 800;
+      background: #f0f0f0;
+      color: #666;
+    }
+    .cash-balance-row.has-change {
+      background: #e8f5e9;
+      color: #1b5e20;
+    }
+    .cash-balance-row.insufficient {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .cash-modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .cash-modal-actions button {
+      flex: 1;
+      padding: 11px;
+      border-radius: 8px;
+      font-size: .92rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #cashClearBtn {
+      background: #fff;
+      border: 1.5px solid #ddd;
+      color: #666;
+    }
+    #cashClearBtn:hover { border-color: #c62828; color: #c62828; }
+    #cashConfirmBtn {
+      background: #00897b;
+      border: none;
+      color: #fff;
+    }
+    #cashConfirmBtn:hover:not(:disabled) { background: #00796b; }
+    #cashConfirmBtn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .menu-item, .toast { transition: none !important; animation: none !important; }
     }
@@ -491,6 +627,49 @@
         <button class="payment-btn" data-method="QR Code">📱 QR Code</button>
         <button class="payment-btn" data-method="TNG eWallet">🧧 TNG eWallet</button>
         <button class="payment-btn" data-method="Card">💳 Card</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- === Cash Payment Modal (denominations + change calculator) === -->
+  <div id="cashPaymentModal" class="modal hidden">
+    <div class="modal-content cash-modal-content">
+      <span id="closeCashModal" class="close">&times;</span>
+      <h3>💵 Cash Payment</h3>
+
+      <div class="cash-total-row">
+        <span>Total Due</span>
+        <span id="cashTotalDue">RM0.00</span>
+      </div>
+
+      <div class="cash-denoms" id="cashDenoms">
+        <button type="button" class="cash-denom-btn" data-amount="1">RM1</button>
+        <button type="button" class="cash-denom-btn" data-amount="5">RM5</button>
+        <button type="button" class="cash-denom-btn" data-amount="10">RM10</button>
+        <button type="button" class="cash-denom-btn" data-amount="20">RM20</button>
+        <button type="button" class="cash-denom-btn" data-amount="50">RM50</button>
+        <button type="button" class="cash-denom-btn" data-amount="100">RM100</button>
+      </div>
+
+      <div class="cash-others-row">
+        <input type="number" id="cashOthersInput" min="0" step="0.01" placeholder="Others (RM)" />
+        <button type="button" id="cashOthersAddBtn">+ Add</button>
+        <button type="button" id="cashExactBtn">Exact</button>
+      </div>
+
+      <div class="cash-received-row">
+        <span>Amount Received</span>
+        <span id="cashReceivedDisplay">RM0.00</span>
+      </div>
+
+      <div class="cash-balance-row" id="cashBalanceRow">
+        <span id="cashBalanceLabel">Balance</span>
+        <span id="cashBalanceDisplay">RM0.00</span>
+      </div>
+
+      <div class="cash-modal-actions">
+        <button type="button" id="cashClearBtn">Clear</button>
+        <button type="button" id="cashConfirmBtn" disabled>Confirm Payment</button>
       </div>
     </div>
   </div>
