@@ -1,3 +1,75 @@
+// === Shared: convert a stock item's on-hand quantity into a target unit ===
+// Returns null if no safe conversion is possible (unit mismatch with no
+// matching conversionUnit set on the stock item).
+// NOTE: kept in sync with the identical copy in dashboard.js.
+function convertStockQtyToUnit(stockItem, targetUnit) {
+  const stockUnit = String(stockItem.unit || "").trim().toLowerCase();
+  const target = String(targetUnit || "").trim().toLowerCase();
+  if (!target) return null;
+  if (stockUnit === target) return parseFloat(stockItem.quantity);
+
+  const convUnit = String(stockItem.conversionUnit || "").trim().toLowerCase();
+  const convValue = parseFloat(stockItem.conversionValue);
+  if (convUnit && convUnit === target && !isNaN(convValue)) {
+    return parseFloat(stockItem.quantity) * convValue;
+  }
+  return null; // units don't match and no usable conversion is set
+}
+
+// === Shared: for a stock item, find the recipe that would run out FIRST,
+// and how many of that drink could still be made from what's on hand. ===
+// NOTE: kept in sync with the identical copy in dashboard.js.
+function getServingsInfo(stockItem, menuData) {
+  let minServings = null;
+  let limitingDrink = null;
+
+  (menuData || []).forEach(drink => {
+    (drink.ingredients || []).forEach(ing => {
+      if (String(ing.name || "").trim().toLowerCase() !== String(stockItem.name || "").trim().toLowerCase()) return;
+      if (!ing.qty || ing.qty <= 0) return;
+
+      const availableQty = convertStockQtyToUnit(stockItem, ing.unit);
+      if (availableQty === null) return; // unit mismatch, can't compute for this recipe
+
+      const servings = Math.floor(availableQty / ing.qty);
+      if (minServings === null || servings < minServings) {
+        minServings = servings;
+        limitingDrink = drink.name;
+      }
+    });
+  });
+
+  return { minServings, limitingDrink };
+}
+
+// === Shared: full low-stock check — quantity threshold OR serving threshold ===
+// NOTE: kept in sync with the identical copy in dashboard.js.
+function getStockLowInfo(item, menuData) {
+  const threshold = parseFloat(item.lowThreshold);
+  const qty = parseFloat(item.quantity);
+  const qtyLow = !isNaN(threshold) && !isNaN(qty) && qty <= threshold;
+
+  let servingsLow = false;
+  let minServings = null;
+  let limitingDrink = null;
+
+  const servingThreshold = parseFloat(item.lowServingThreshold);
+  if (!isNaN(servingThreshold)) {
+    const info = getServingsInfo(item, menuData);
+    minServings = info.minServings;
+    limitingDrink = info.limitingDrink;
+    if (minServings !== null && minServings <= servingThreshold) {
+      servingsLow = true;
+    }
+  }
+
+  return { isLow: qtyLow || servingsLow, qtyLow, servingsLow, minServings, limitingDrink };
+}
+
+function loadMenu() {
+  return JSON.parse(localStorage.getItem("menuItems") || "[]");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const user = localStorage.getItem("mintchaUser");
   const role = localStorage.getItem("mintchaRole");
@@ -14,6 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const conversionUnitInput = document.getElementById("conversionUnit");
   const conversionValueInput = document.getElementById("conversionValue");
   const lowThresholdInput = document.getElementById("lowThreshold");
+  const lowServingThresholdInput = document.getElementById("lowServingThreshold");
 
   const cashierDisplay = document.getElementById("currentCashier");
   if (cashierDisplay && user) cashierDisplay.textContent = user;
@@ -81,18 +154,29 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("mintcha_stock", JSON.stringify(stockList));
   }
 
+  // Coerces through parseFloat rather than requiring typeof === "number",
+  // so a threshold/quantity that ended up stored as a string (CSV import,
+  // restored backup, manual localStorage edit) still gets picked up
+  // instead of silently being skipped. Kept in sync with the identical
+  // check in dashboard.js's getLowStockItems().
+  function isItemLow(item) {
+    return getStockLowInfo(item, loadMenu()).isLow;
+  }
+
   window.getLowStockItems = function () {
     const stock = loadStock();
-    return stock.filter(item => item.lowThreshold && item.quantity <= item.lowThreshold);
+    return stock.filter(isItemLow);
   };
 
   function renderStockTable() {
     const stockList = loadStock();
+    const menuData = loadMenu();
     const showOnlyLow = document.getElementById("toggleLowStockOnly")?.checked;
     stockTableBody.innerHTML = "";
 
     stockList.forEach((item, index) => {
-      const isLow = typeof item.lowThreshold === "number" && item.quantity <= item.lowThreshold;
+      const lowInfo = getStockLowInfo(item, menuData);
+      const isLow = lowInfo.isLow;
       if (showOnlyLow && !isLow) return;
 
       const row = document.createElement("tr");
@@ -102,10 +186,23 @@ document.addEventListener("DOMContentLoaded", () => {
         ? `1 ${item.unit} = ${item.conversionValue} ${item.conversionUnit}`
         : "-";
 
+      // Two independent warning badges can appear together: one for raw
+      // quantity dropping below lowThreshold, one for "can only make N
+      // more drinks" dropping below lowServingThreshold. Either, both, or
+      // neither can be true at once.
+      let warningHtml = "";
+      if (lowInfo.qtyLow) {
+        warningHtml += ` <span style="color:red;" title="Below quantity threshold">⚠️</span>`;
+      }
+      if (lowInfo.servingsLow) {
+        const drinkLabel = lowInfo.limitingDrink ? ` ${lowInfo.limitingDrink}` : "";
+        warningHtml += ` <span style="color:#e65100;" title="Only ${lowInfo.minServings}${drinkLabel} left in stock">🥤 ~${lowInfo.minServings}</span>`;
+      }
+
       row.innerHTML = `
         <td>${index + 1}</td>
         <td>${item.name}</td>
-        <td>${item.quantity} ${isLow ? ' <span style="color:red;">⚠️</span>' : ''}</td>
+        <td>${item.quantity}${warningHtml}</td>
         <td>${item.unit}</td>
         <td>${conversion}</td>
         <td>
@@ -130,10 +227,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const conversionUnit = conversionUnitInput.value.trim();
     const conversionValue = parseFloat(conversionValueInput.value);
     const lowThreshold = parseFloat(lowThresholdInput.value);
+    const lowServingThreshold = parseFloat(lowServingThresholdInput.value);
 
     if (!name || isNaN(quantity) || !unit) {
       showToast("Please fill in name, quantity, and unit.", "error");
       return;
+    }
+
+    if (lowThresholdInput.value.trim() === "" && lowServingThresholdInput.value.trim() === "") {
+      // Not a hard blocker — some items genuinely don't need either
+      // threshold — but this is the #1 cause of "why isn't this showing
+      // as low stock," so flag it clearly instead of saving silently.
+      const proceed = confirm(
+        "⚠️ No Low Stock Threshold or Low Serving Threshold set for this item.\n\n" +
+        "Without at least one of these, this item will NEVER appear in Low Stock Alerts " +
+        "no matter how low the quantity gets or how few drinks it can still make.\n\n" +
+        "Save anyway without either threshold?"
+      );
+      if (!proceed) return;
     }
 
     const stockList = loadStock();
@@ -150,7 +261,8 @@ document.addEventListener("DOMContentLoaded", () => {
       unit,
       conversionUnit: conversionUnit || "",
       conversionValue: isNaN(conversionValue) ? null : conversionValue,
-      lowThreshold: isNaN(lowThreshold) ? null : lowThreshold
+      lowThreshold: isNaN(lowThreshold) ? null : lowThreshold,
+      lowServingThreshold: isNaN(lowServingThreshold) ? null : lowServingThreshold
     };
 
     if (isEditing && editIndex !== null) {
@@ -179,6 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
     conversionUnitInput.value = item.conversionUnit || "";
     conversionValueInput.value = item.conversionValue ?? "";
     lowThresholdInput.value = item.lowThreshold ?? "";
+    lowServingThresholdInput.value = item.lowServingThreshold ?? "";
 
     isEditing = true;
     editIndex = index;
@@ -200,13 +313,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const stock = loadStock();
     if (!stock.length) return showToast("No stock data to export!", "error");
 
-    const csvHeader = "Item,Quantity,Unit,Conversion,LowThreshold\n";
+    const csvHeader = "Item,Quantity,Unit,Conversion,LowThreshold,LowServingThreshold\n";
     const csvRows = stock.map(item => {
       const conversion = item.conversionUnit && item.conversionValue
         ? `1 ${item.unit} = ${item.conversionValue} ${item.conversionUnit}`
         : "";
       const lowThreshold = item.lowThreshold ?? "";
-      return `"${item.name}",${item.quantity},"${item.unit}","${conversion}",${lowThreshold}`;
+      const lowServingThreshold = item.lowServingThreshold ?? "";
+      return `"${item.name}",${item.quantity},"${item.unit}","${conversion}",${lowThreshold},${lowServingThreshold}`;
     });
 
     const csvContent = csvHeader + csvRows.join("\n");
@@ -226,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const rows = csvText.trim().split("\n").slice(1);
 
     const parsed = rows.map(row => {
-      const [name, quantityStr, unit, conversion, lowThresholdStr] = row.split(",");
+      const [name, quantityStr, unit, conversion, lowThresholdStr, lowServingThresholdStr] = row.split(",");
       const quantity = parseFloat(quantityStr);
       let conversionUnit = "", conversionValue = null;
 
@@ -244,7 +358,8 @@ document.addEventListener("DOMContentLoaded", () => {
         unit: unit.replace(/"/g, "").trim(),
         conversionUnit,
         conversionValue,
-        lowThreshold: isNaN(parseFloat(lowThresholdStr)) ? null : parseFloat(lowThresholdStr)
+        lowThreshold: isNaN(parseFloat(lowThresholdStr)) ? null : parseFloat(lowThresholdStr),
+        lowServingThreshold: isNaN(parseFloat(lowServingThresholdStr)) ? null : parseFloat(lowServingThresholdStr)
       };
     });
 
@@ -265,4 +380,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   renderStockTable();
+
+  // Keep the table (and its low-stock badges) live if a recipe changes on
+  // Menu Recipes while this tab is open, same pattern as dashboard.js.
+  window.addEventListener("storage", (e) => {
+    if (["mintcha_stock", "menuItems"].includes(e.key)) {
+      renderStockTable();
+    }
+  });
 });

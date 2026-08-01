@@ -1,4 +1,4 @@
-console.log("[dashboard.js] v3 loaded — reorder alerts + auth guard active");
+console.log("[dashboard.js] v4 loaded — servings-based low stock alerts + auth guard active");
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireAuth()) return;
@@ -55,9 +55,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return JSON.parse(localStorage.getItem("mintcha_stock") || "[]");
   }
 
+  // Load raw menu items (with ingredients/recipes) from localStorage
+  function loadMenuItemsRaw() {
+    return JSON.parse(localStorage.getItem("menuItems") || "[]");
+  }
+
   // Load menu items (for category + price lookup) from localStorage
   function loadMenuCategoryMap() {
-    const menuItems = JSON.parse(localStorage.getItem("menuItems") || "[]");
+    const menuItems = loadMenuItemsRaw();
     const map = {};
     menuItems.forEach(item => {
       map[item.name] = { category: item.category || "uncategorized", price: item.price || 0 };
@@ -65,14 +70,85 @@ document.addEventListener("DOMContentLoaded", () => {
     return map;
   }
 
-  // Reusable function to get low stock items
+  // === Shared: convert a stock item's on-hand quantity into a target unit ===
+  // Returns null if no safe conversion is possible (unit mismatch with no
+  // matching conversionUnit set on the stock item).
+  // NOTE: kept in sync with the identical copy in stock-overview.js.
+  function convertStockQtyToUnit(stockItem, targetUnit) {
+    const stockUnit = String(stockItem.unit || "").trim().toLowerCase();
+    const target = String(targetUnit || "").trim().toLowerCase();
+    if (!target) return null;
+    if (stockUnit === target) return parseFloat(stockItem.quantity);
+
+    const convUnit = String(stockItem.conversionUnit || "").trim().toLowerCase();
+    const convValue = parseFloat(stockItem.conversionValue);
+    if (convUnit && convUnit === target && !isNaN(convValue)) {
+      return parseFloat(stockItem.quantity) * convValue;
+    }
+    return null; // units don't match and no usable conversion is set
+  }
+
+  // === Shared: for a stock item, find the recipe that would run out FIRST,
+  // and how many of that drink could still be made from what's on hand. ===
+  // NOTE: kept in sync with the identical copy in stock-overview.js.
+  function getServingsInfo(stockItem, menuData) {
+    let minServings = null;
+    let limitingDrink = null;
+
+    (menuData || []).forEach(drink => {
+      (drink.ingredients || []).forEach(ing => {
+        if (String(ing.name || "").trim().toLowerCase() !== String(stockItem.name || "").trim().toLowerCase()) return;
+        if (!ing.qty || ing.qty <= 0) return;
+
+        const availableQty = convertStockQtyToUnit(stockItem, ing.unit);
+        if (availableQty === null) return; // unit mismatch, can't compute for this recipe
+
+        const servings = Math.floor(availableQty / ing.qty);
+        if (minServings === null || servings < minServings) {
+          minServings = servings;
+          limitingDrink = drink.name;
+        }
+      });
+    });
+
+    return { minServings, limitingDrink };
+  }
+
+  // === Shared: full low-stock check — quantity threshold OR serving threshold ===
+  // NOTE: kept in sync with the identical copy in stock-overview.js.
+  function getStockLowInfo(item, menuData) {
+    const threshold = parseFloat(item.lowThreshold);
+    const qty = parseFloat(item.quantity);
+    const qtyLow = !isNaN(threshold) && !isNaN(qty) && qty <= threshold;
+
+    let servingsLow = false;
+    let minServings = null;
+    let limitingDrink = null;
+
+    const servingThreshold = parseFloat(item.lowServingThreshold);
+    if (!isNaN(servingThreshold)) {
+      const info = getServingsInfo(item, menuData);
+      minServings = info.minServings;
+      limitingDrink = info.limitingDrink;
+      if (minServings !== null && minServings <= servingThreshold) {
+        servingsLow = true;
+      }
+    }
+
+    return { isLow: qtyLow || servingsLow, qtyLow, servingsLow, minServings, limitingDrink };
+  }
+
+  // Reusable function to get low stock items — now flags an item if EITHER
+  // its raw quantity is at/below lowThreshold OR the number of drinks it
+  // can still make (via recipes in menu-recipes) is at/below
+  // lowServingThreshold. Each returned item carries a `_lowInfo` object so
+  // the renderer can show which condition(s) tripped.
   function getLowStockItems() {
     const stockList = loadStock();
-    return stockList.filter(item => {
-      return typeof item.lowThreshold === "number" &&
-             !isNaN(item.lowThreshold) &&
-             item.quantity <= item.lowThreshold;
-    });
+    const menuData = loadMenuItemsRaw();
+    return stockList
+      .map(item => ({ ...item, _lowInfo: getStockLowInfo(item, menuData) }))
+      .filter(item => item._lowInfo.isLow);
   }
 
   // === Low Stock / Reorder Alerts ===
@@ -100,12 +176,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const isCup = /cup/i.test(item.name) || /cup/i.test(item.unit || "");
       const icon = isCup ? "🥤" : "⚠️";
       const critical = item.quantity <= 0;
+      const info = item._lowInfo;
+
+      const reasons = [];
+      if (info.qtyLow) {
+        reasons.push(critical ? "OUT OF STOCK — order now!" : `Below ${item.lowThreshold} — order soon`);
+      }
+      if (info.servingsLow) {
+        const drinkLabel = info.limitingDrink ? ` ${info.limitingDrink}` : "";
+        reasons.push(`Can only make ${info.minServings}${drinkLabel}${info.minServings === 1 ? "" : "s"} more`);
+      }
 
       return `
         <li class="${critical ? "stock-critical" : "stock-low"}">
           <strong>${icon} ${item.name}</strong> – ${item.quantity} ${item.unit}
           ${item.conversionUnit ? ` (${item.conversionUnit})` : ""}
-          <span class="reorder-tag">${critical ? "OUT OF STOCK — order now!" : `Below ${item.lowThreshold} — order soon`}</span>
+          <span class="reorder-tag">${reasons.join(" · ")}</span>
         </li>
       `;
     }).join("");
@@ -607,6 +693,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // A visibilitychange listener is added as a cheap extra safety net for
   // same-tab cases the two above don't cover (e.g. switching to this tab
   // after editing stock elsewhere in the same tab's history).
+  //
+  // NOTE: "menuItems" is included here (not just mintcha_stock /
+  // mintcha_sales) because editing a recipe's ingredient quantities on the
+  // Menu Recipes page can change a stock item's computed "servings
+  // remaining" even though the stock item itself was never touched.
   window.addEventListener("storage", (e) => {
     if (["mintcha_stock", "mintcha_sales", "menuItems"].includes(e.key)) {
       refreshDashboardData();
