@@ -574,8 +574,50 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  setupSummaryDatePicker();
-  refreshSummary();
+  // === Single entry point for "re-check everything and redraw" ===
+  // Both the summary/category boxes and the Low Stock Alerts list are pure
+  // reads from localStorage, so it's always safe to just recompute both
+  // together whenever there's a chance the underlying data changed.
+  function refreshDashboardData() {
+    refreshSummary();
+    renderLowStockAlerts();
+  }
 
-  renderLowStockAlerts();
+  setupSummaryDatePicker();
+  refreshDashboardData();
+
+  // === Keep the Dashboard live instead of "correct only at the moment it
+  // first loaded" ===
+  // Without this, Low Stock Alerts / Today's Summary are computed exactly
+  // once, on DOMContentLoaded. That goes stale in two common situations:
+  //
+  //   1. Another browser TAB writes to localStorage (e.g. a cashier
+  //      checks out an order in Order Management, or an admin edits
+  //      quantity in Stock Overview) while this Dashboard tab is already
+  //      open — the 'storage' event fires in every OTHER tab when that
+  //      happens, so we listen for it here and re-render.
+  //
+  //   2. Navigating back to this tab via the browser's Back/Forward
+  //      button can restore the page from bfcache without re-running any
+  //      script at all (DOMContentLoaded never fires again) — so it can
+  //      keep showing "✅ All stock levels are sufficient" even after a
+  //      sale just dropped something below threshold. 'pageshow' with
+  //      event.persisted === true catches exactly this case.
+  //
+  // A visibilitychange listener is added as a cheap extra safety net for
+  // same-tab cases the two above don't cover (e.g. switching to this tab
+  // after editing stock elsewhere in the same tab's history).
+  window.addEventListener("storage", (e) => {
+    if (["mintcha_stock", "mintcha_sales", "menuItems"].includes(e.key)) {
+      refreshDashboardData();
+    }
+  });
+
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) refreshDashboardData();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshDashboardData();
+  });
 });
