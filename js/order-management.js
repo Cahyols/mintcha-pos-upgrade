@@ -633,6 +633,14 @@ function calculateDiscount(cartItems, discountLabel) {
       case "Free":
       discountAmount = subtotal;
       break;
+    case "Cookiedoh Combo (-RM1)":
+      // Cross-tenant promo: buy 2 cookies (Cookiedoh) + 1 drink (Mintcha),
+      // get RM2 off total — RM1 off is absorbed by each tenant. This is
+      // Mintcha's RM1 half; the cookies/other RM1 aren't in this system,
+      // so it's a flat RM1 off the drink order (cashier applies it when
+      // the customer redeems the combo).
+      discountAmount = 1;
+      break;
   }
 
   if (discountAmount > subtotal) discountAmount = subtotal;
@@ -784,6 +792,9 @@ discountOptions.forEach(button => {
         break;
         case "free":
         appliedDiscount = "Free";
+        break;
+      case "cookiedoh":
+        appliedDiscount = "Cookiedoh Combo (-RM1)";
         break;
     }
 
@@ -979,6 +990,13 @@ document.addEventListener("DOMContentLoaded", () => {
             <div><strong>Change Given:</strong> RM${cashInfo.change.toFixed(2)}</div>
       ` : "";
 
+      // Cookiedoh collects the money at their counter on our behalf and
+      // settles with us every Monday — flag that clearly on the receipt
+      // so the cashier/customer know this sale isn't cash-in-drawer today.
+      const cookiedohReceiptBlock = method === "Cookiedoh" ? `
+            <div><strong>Settlement:</strong> Collected by Cookiedoh — paid to Mintcha every Monday</div>
+      ` : "";
+
       receiptContent.innerHTML = `
         <div class="receipt-brand">🍃 Mintcha</div>
         <div class="receipt-header">
@@ -998,6 +1016,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
           <strong>Total:</strong> RM${total.toFixed(2)}<br>
           ${cashReceiptBlock}
+          ${cookiedohReceiptBlock}
           <div class="receipt-barcode"></div>
           <div>#TeamRumput VS #TeamMint 💚</div>
           <button id="closeReceiptModal">OK</button>
@@ -1019,7 +1038,11 @@ document.addEventListener("DOMContentLoaded", () => {
         total,
         status: "Pending",
         // Only present for Cash payments — omitted entirely for QR/eWallet/Card
-        ...(cashInfo ? { cashReceived: cashInfo.received, changeGiven: cashInfo.change } : {})
+        ...(cashInfo ? { cashReceived: cashInfo.received, changeGiven: cashInfo.change } : {}),
+        // Only present for Cookiedoh sales — Cookiedoh holds the cash and
+        // settles with Mintcha weekly, so these need to be tracked as
+        // outstanding until they pay up on Monday.
+        ...(method === "Cookiedoh" ? { settlementStatus: "Owed by Cookiedoh", settlementDay: "Monday" } : {})
       };
 
       const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");

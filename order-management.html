@@ -23,10 +23,6 @@
       margin-right: 2px;
     }
 
-    /* Edit Menu / Reorder Menu now sit in the same row as the Dine In /
-       Delivery tabs and share their pill art style (light border/bg,
-       teal fill + white text once active), instead of the old standalone
-       yellow admin buttons. */
     .menu-toolbar-row {
       display: flex;
       align-items: center;
@@ -58,18 +54,11 @@
     }
     .admin-mode-tab:disabled { opacity: .5; cursor: not-allowed; }
 
-    /* === Minimalist panel sizing ===
-       style.css's .menu-panel/.cart-panel are shared with other pages, so
-       rather than edit that shared file, these page-scoped overrides trim
-       the padding and drop the fixed 400px min-height that was making both
-       panels feel oversized on this page specifically. */
     .order-container { gap: 1.25rem; }
     .menu-panel, .cart-panel {
       padding: 1rem 1.15rem;
       min-height: 0;
     }
-    /* style.css gives both panels an even flex: 1 (50/50) — this page
-       reads better with more room for the menu grid than the cart form. */
     .menu-panel { flex: 3; }
     .cart-panel { flex: 2; }
     .menu-title,
@@ -83,15 +72,12 @@
       border-bottom: 1px solid #eee;
     }
 
-    /* === Menu body layout: category sidebar on the left, grid on the
-       right. Order type tabs sit above this whole row. === */
     .menu-body-layout {
       display: flex;
       gap: 16px;
       align-items: flex-start;
     }
 
-    /* === Order type tabs (Dine In / Delivery) === */
     .order-type-tabs {
       display: flex;
       gap: 8px;
@@ -121,7 +107,6 @@
 
     .menu-main { flex: 1 1 auto; min-width: 0; }
 
-    /* === Category filter tabs (vertical sidebar to the left of the grid) === */
     .menu-cat-tabs {
       display: flex;
       flex-direction: column;
@@ -148,63 +133,60 @@
       background: #e0f2f1;
       font-weight: 700;
     }
-    /* === Color tag dot + popover === */
-.menu-item { position: relative; } /* needed so the popover positions correctly */
+    .menu-item { position: relative; }
 
-.color-dot-btn {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(0,0,0,.25);
-  padding: 0;
-  cursor: pointer;
-  z-index: 2;
-}
-.color-dot-empty {
-  background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 0 / 6px 6px;
-}
+    .color-dot-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,.25);
+      padding: 0;
+      cursor: pointer;
+      z-index: 2;
+    }
+    .color-dot-empty {
+      background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 0 / 6px 6px;
+    }
 
-.color-swatch-popover {
-  position: absolute;
-  top: 26px;
-  right: 6px;
-  display: flex;
-  gap: 4px;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.15);
-  z-index: 10;
-}
-.color-swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(0,0,0,.15);
-  padding: 0;
-  cursor: pointer;
-}
-.color-swatch:hover { transform: scale(1.15); }
-.color-swatch-clear {
-  background: #fff;
-  color: #999;
-  font-size: .7rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-    /* === Drag & drop reorder states === */
+    .color-swatch-popover {
+      position: absolute;
+      top: 26px;
+      right: 6px;
+      display: flex;
+      gap: 4px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      z-index: 10;
+    }
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,.15);
+      padding: 0;
+      cursor: pointer;
+    }
+    .color-swatch:hover { transform: scale(1.15); }
+    .color-swatch-clear {
+      background: #fff;
+      color: #999;
+      font-size: .7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .menu-item.draggable-item { cursor: grab; }
     .menu-item.draggable-item:active { cursor: grabbing; }
     .menu-item.dragging { opacity: 0.4; }
     .menu-item.drag-over { outline: 2px dashed #f9a825; outline-offset: 2px; }
     .drag-handle { cursor: grab; margin-right: 4px; opacity: 0.6; user-select: none; }
 
-    /* === Menu grid: consistent card size, readable 2-line names === */
     .menu-items { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
     .menu-item {
       height: 104px;
@@ -231,16 +213,15 @@
     }
     .menu-item .price-tag { font-weight: 700; color: #00796b; font-size: .9rem; }
     .menu-item .name-input {
-  width: 100%;
-  font-size: .92rem;
-  font-weight: 700;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin-bottom: 4px;
-  box-sizing: border-box;
-}
-    /* Edit-mode card needs a little room to fit name + one price field */
+      width: 100%;
+      font-size: .92rem;
+      font-weight: 700;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 2px 4px;
+      margin-bottom: 4px;
+      box-sizing: border-box;
+    }
     .menu-item:has(.price-edit-label) { height: auto; min-height: 104px; padding-bottom: 10px; }
     .price-edit-label {
       display: flex;
@@ -269,15 +250,11 @@
       100% { transform: scale(1); }
     }
 
-    /* === Sold-out / unavailable menu cards ===
-       Applied when live stock can't cover even 1 more of this drink.
-       Grayed out, crossed-out name, blocked cursor, unclickable (JS also
-       blocks the click/keydown handlers — this is the visual half). */
     .menu-item.menu-item-unavailable {
       filter: grayscale(85%);
       opacity: .55;
       cursor: not-allowed;
-      pointer-events: none; /* belt-and-suspenders alongside the JS guard */
+      pointer-events: none;
     }
     .menu-item.menu-item-unavailable:hover {
       transform: none;
@@ -289,7 +266,7 @@
       text-decoration-thickness: 2px;
     }
     .menu-item.menu-item-unavailable .color-dot-btn {
-      pointer-events: none; /* don't let the color picker open on a disabled card */
+      pointer-events: none;
     }
     .sold-out-badge {
       position: absolute;
@@ -306,7 +283,6 @@
       z-index: 1;
     }
 
-    /* === Cart line items: same look as before, just clearer + bigger touch targets === */
     .cart-item { flex-direction: column; align-items: stretch; gap: 6px; }
     .cart-item-top { display: flex; justify-content: space-between; font-weight: 600; }
     .cart-item-top .unit-price { font-weight: 400; color: #777; font-size: .8rem; white-space: nowrap; }
@@ -320,10 +296,9 @@
     }
     .line-total { font-weight: 700; color: #00796b; white-space: nowrap; }
 
-    /* === Totals summary: broken into scannable rows instead of one line === */
     .cart-summary { margin-top: .5rem; border-top: 1px dashed #ccc; padding-top: .6rem; font-size: .92rem; }
     .cart-summary-row { display: flex; justify-content: space-between; padding: 2px 0; }
-    .cart-summary-row.discount { color: #d32f2f; font-weight: 600; } /* matches the sales-table discount column color */
+    .cart-summary-row.discount { color: #d32f2f; font-weight: 600; }
     .cart-summary-row.total {
       font-weight: 800;
       font-size: 1.15rem;
@@ -334,7 +309,6 @@
 
     .field-label { font-size: .78rem; font-weight: 600; color: #777; margin: 8px 0 3px; display: block; }
 
-    /* === Action buttons: clear priority instead of three identical buttons === */
     .cart-actions { flex-direction: column; gap: 8px; }
     #proceedPayment { order: 1; padding: .9rem; font-size: 1rem; font-weight: 700; }
     #discountBtn {
@@ -345,28 +319,20 @@
     }
     #discountBtn:hover { background-color: #e0f2f1; }
     #cancelOrder {
-  order: 3;
-  background-color: #f44336;
-  color: #fff;
-  border: none;
-  padding: .9rem;
-  font-size: 1rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-#cancelOrder:hover { background-color: #d32f2f; }
+      order: 3;
+      background-color: #f44336;
+      color: #fff;
+      border: none;
+      padding: .9rem;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    #cancelOrder:hover { background-color: #d32f2f; }
     #cancelOrder:hover { background: transparent; color: #d32f2f; }
 
-    /* .empty-state was referenced in the HTML/JS but never actually defined
-       in style.css (only .empty-menu was) — filling that gap here. */
     .empty-state { text-align: center; padding: 20px; color: #888; font-style: italic; }
 
-    /* =========================================================
-       === Cash Payment Modal ===
-       Denomination buttons, "Others" custom amount, and a live
-       balance/change display. Palette matches the rest of the page
-       (teal = fine/positive, red = insufficient).
-       ========================================================= */
     .cash-modal-content { max-width: 380px; }
 
     .cash-total-row {
@@ -497,12 +463,28 @@
       cursor: not-allowed;
     }
 
+    /* === Cookiedoh combo discount option — tan/brown accent so it reads
+       as a distinct cross-tenant promo, not just another % off. === */
+    .discount-option.discount-cookiedoh {
+      background-color: #EED7A1;
+      color: #6d4c1f;
+      border: 1.5px solid #d8b96e;
+    }
+    .discount-option.discount-cookiedoh:hover { background-color: #e6c780; }
+
+    /* === Cookiedoh payment method — same tan accent as the discount tag,
+       so cashiers visually associate the two. === */
+    .payment-btn.payment-cookiedoh {
+      background-color: #EED7A1;
+      color: #6d4c1f;
+      border: 1.5px solid #d8b96e;
+    }
+    .payment-btn.payment-cookiedoh:hover { background-color: #e6c780; }
+
     @media (prefers-reduced-motion: reduce) {
       .menu-item, .toast { transition: none !important; animation: none !important; }
     }
 
-    /* Stack the toolbar row and the category sidebar, and let order type
-       tabs fill the width, on narrow screens */
     @media (max-width: 700px) {
       .menu-toolbar-row { flex-direction: column; align-items: stretch; }
       .order-type-tabs, #priceControls { width: 100%; }
@@ -554,10 +536,6 @@
         <div class="menu-panel">
           <h2 class="menu-title">Menu</h2>
 
-          <!-- Order type: Dine In / Delivery. Each still shows all
-               categories — it only changes which price is used.
-               Edit Menu / Reorder Menu now line up on the same row and
-               share the tab pill styling. -->
           <div class="menu-toolbar-row">
             <div class="order-type-tabs" id="orderTypeTabs">
               <button class="order-type-tab active" data-ordertype="dineIn">
@@ -627,6 +605,7 @@
         <button class="payment-btn" data-method="QR Code">📱 QR Code</button>
         <button class="payment-btn" data-method="TNG eWallet">🧧 TNG eWallet</button>
         <button class="payment-btn" data-method="Card">💳 Card</button>
+        <button class="payment-btn payment-cookiedoh" data-method="Cookiedoh">🍪 Cookiedoh (settles Mon)</button>
       </div>
     </div>
   </div>
@@ -692,6 +671,7 @@
 
         <button class="discount-option" data-type="buy2free1">Buy 2 Free 1</button>
          <button class="discount-option discount-free" data-type="free">🎉 Free (Special)</button>
+        <button class="discount-option discount-cookiedoh" data-type="cookiedoh">🍪 Cookiedoh Combo (-RM1)</button>
       </div>
 
       <button id="removeDiscountBtn">Remove Discount</button>
