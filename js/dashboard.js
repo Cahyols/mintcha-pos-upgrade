@@ -1,4 +1,4 @@
-console.log("[dashboard.js] v4 loaded — servings-based low stock alerts + auth guard active");
+console.log("[dashboard.js] v5 loaded — Cookiedoh sales split out + servings-based low stock alerts + auth guard active");
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireAuth()) return;
@@ -277,8 +277,18 @@ document.addEventListener("DOMContentLoaded", () => {
     matcha: "Matcha",
     coffee: "Coffee",
     dessert: "Dessert",
-    uncategorized: "Uncategorized"
+    uncategorized: "Uncategorized",
+    cookiedoh: "🍪 Cookiedoh"
   };
+
+  // A sale is a Cookiedoh sale if Cookiedoh collected the payment for it —
+  // see order-management.js's "Cookiedoh (settles Mon)" payment method.
+  // Every item on that sale is tallied under the Cookiedoh bucket instead
+  // of its usual Matcha/Coffee/Dessert category, so the two don't overlap
+  // and this number can be tallied 1:1 against what Cookiedoh reports.
+  function isCookiedohSale(sale) {
+    return sale.paymentMethod === "Cookiedoh";
+  }
 
   function renderHourlyReport(rangeSales, mode) {
     const card = document.getElementById("hourlyReportCard");
@@ -323,6 +333,8 @@ document.addEventListener("DOMContentLoaded", () => {
       bucket.transactions += 1;
       bucket.discount += parseFloat(sale.discountAmount || 0);
 
+      const saleIsCookiedoh = isCookiedohSale(sale);
+
       (sale.items || []).forEach(item => {
         // Add-ons aren't a cup — don't count them toward the 🥤 cup tally
         // or the per-category cup counts, even though they're still a
@@ -333,7 +345,9 @@ document.addEventListener("DOMContentLoaded", () => {
         bucket.cups += qty;
 
         const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
-        const cat = CATEGORY_DISPLAY_NAMES[meta.category] ? meta.category : "uncategorized";
+        const cat = saleIsCookiedoh
+          ? "cookiedoh"
+          : (CATEGORY_DISPLAY_NAMES[meta.category] ? meta.category : "uncategorized");
         bucket.categoryCups[cat] = (bucket.categoryCups[cat] || 0) + qty;
       });
     });
@@ -430,7 +444,11 @@ document.addEventListener("DOMContentLoaded", () => {
   matcha:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
   coffee:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
   dessert: { cups: 0, revenue: 0, discount: 0, drinks: {} },
-  uncategorized: { cups: 0, revenue: 0, discount: 0, drinks: {} }
+  uncategorized: { cups: 0, revenue: 0, discount: 0, drinks: {} },
+  // Sales collected by Cookiedoh (see isCookiedohSale) — kept separate so
+  // it can be tallied against what Cookiedoh reports collecting, and so
+  // those drinks don't get double-listed under Matcha/Coffee/Dessert too.
+  cookiedoh: { cups: 0, revenue: 0, discount: 0, drinks: {} }
 };
 
    rangeSales.forEach(sale => {
@@ -466,9 +484,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // sold at, if the menu price has since changed — acceptable since it's
   // only used to apportion the discount, not to total up revenue.)
   const saleCategorySubtotal = {};
+  const saleIsCookiedoh = isCookiedohSale(sale);
   (sale.items || []).forEach(item => {
     const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
-    const cat = categoryTotals[meta.category] ? meta.category : "uncategorized";
+    // Cookiedoh sales are tallied on their own — never split back into
+    // Matcha/Coffee/Dessert/Uncategorized, so nothing gets counted twice.
+    const cat = saleIsCookiedoh
+      ? "cookiedoh"
+      : (categoryTotals[meta.category] ? meta.category : "uncategorized");
     const qty = item.qty || 0;
     const lineTotal = (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
 
@@ -573,6 +596,15 @@ document.addEventListener("DOMContentLoaded", () => {
             ${renderCategoryDrinksList(categoryTotals[cat].drinks)}
           </div>
         `).join("")}
+        ${categoryTotals.cookiedoh.cups > 0 ? `
+          <div class="category-box cat-cookiedoh">
+            <span class="cat-badge cat-cookiedoh">🍪 Cookiedoh</span>
+            <span class="category-cups">${categoryTotals.cookiedoh.cups}</span>
+            <span class="category-sub">RM${categoryTotals.cookiedoh.revenue.toFixed(2)}</span>
+            ${categoryTotals.cookiedoh.discount > 0 ? `<span class="category-discount">-RM${categoryTotals.cookiedoh.discount.toFixed(2)} discount</span>` : ""}
+            ${renderCategoryDrinksList(categoryTotals.cookiedoh.drinks)}
+          </div>
+        ` : ""}
         ${categoryTotals.uncategorized.cups > 0 ? `
           <div class="category-box cat-uncat">
             <span class="cat-badge cat-uncat">Uncategorized</span>
