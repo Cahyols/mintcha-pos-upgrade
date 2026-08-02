@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Coffee Traps Settlement – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .page-content { padding: 0 1.5rem 1.5rem; }
+    .dashboard-header {
+      padding: 1.5rem 1.5rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .dashboard-header h1 { margin: 0; }
+
+    .ct-page-note {
+      font-size: .82rem;
+      color: #888;
+      margin: -6px 0 1.25rem;
+      line-height: 1.5;
+    }
+
+    /* === Next Payout hero banner === */
+    .ct-next-payout {
+      background: linear-gradient(135deg, #6d4c1f, #a9702f);
+      color: #fff;
+      border-radius: 14px;
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 16px rgba(109,76,31,.25);
+    }
+    .ct-next-payout-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .ct-next-payout-label {
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      opacity: .85;
+      font-weight: 700;
+    }
+    .ct-next-payout-date {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+    .ct-next-payout-amount {
+      font-size: 2.1rem;
+      font-weight: 800;
+    }
+    .ct-next-payout-range {
+      font-size: .82rem;
+      opacity: .85;
+      margin-bottom: 14px;
+    }
+    .ct-next-payout .ct-week-body { background: rgba(255,255,255,.1); border-radius: 10px; padding: 14px 16px; }
+    .ct-next-payout .ct-line span:last-child { color: #fff; }
+    .ct-next-payout .ct-line.ct-deduct span:last-child { color: #ffd6d6; }
+    .ct-next-payout .ct-drink-list { background: rgba(255,255,255,.12); }
+    .ct-next-payout .ct-drink-row { color: rgba(255,255,255,.85); }
+    .ct-next-payout .ct-channel-breakdown { color: rgba(255,255,255,.8); }
+    .ct-next-payout .ct-manual-input { background: rgba(255,255,255,.9); }
+    .ct-next-payout .ct-net-total { border-top-color: rgba(255,255,255,.3); color: #fff; }
+    .ct-next-payout .ct-extras-title { color: #ffe9c2; }
+
+    /* === Top control bar: month nav + cup charge setting === */
+    .ct-controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .ct-month-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ct-month-nav button {
+      padding: 6px 12px;
+      font-weight: 700;
+      background: #fff;
+      border: 1px solid #00897b;
+      color: #00796b;
+      border-radius: 6px;
+    }
+    .ct-month-nav button:hover { background: #e0f2f1; }
+    #ctMonthLabel {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #004d40;
+      min-width: 170px;
+      text-align: center;
+    }
+    .ct-settings-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .88rem;
+      color: #555;
+    }
+    .ct-settings-inline label { font-weight: 600; }
+    #ctCupChargeInput {
+      width: 80px;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: .9rem;
+    }
+
+    /* === Month total banner === */
+    .ct-month-total-banner {
+      background: linear-gradient(135deg, #00796b, #00897b);
+      color: #fff;
+      border-radius: 10px;
+      padding: 1rem 1.4rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ct-month-total-banner .label {
+      font-size: .82rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      opacity: .9;
+    }
+    .ct-month-total-banner .value {
+      font-size: 1.8rem;
+      font-weight: 800;
+    }
+
+    /* === Week cards === */
+    #ctWeeksContainer {
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+    .ct-week-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.25rem 1.4rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      border: 1px solid #eee;
+    }
+    .ct-week-card.ct-last-week {
+      border: 1px solid #e6c780;
+      background: #fffdf7;
+    }
+    .ct-week-card.ct-is-next {
+      border: 1.5px solid #a9702f;
+    }
+    .ct-week-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .ct-week-header h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .ct-week-range {
+      font-size: .8rem;
+      font-weight: 500;
+      color: #888;
+    }
+    .ct-settle-tag {
+      font-size: .78rem;
+      font-weight: 700;
+      color: #00796b;
+      background: #e0f2f1;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .ct-last-week .ct-settle-tag {
+      color: #6d4c1f;
+      background: #f7ecd3;
+    }
+    .ct-next-tag {
+      font-size: .7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #a9702f;
+      background: #fbe9d0;
+      padding: 3px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+    }
+
+    .ct-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      font-size: .92rem;
+    }
+    .ct-line.ct-deduct span:last-child { color: #c62828; font-weight: 600; }
+    .ct-line.ct-subtotal span:last-child { color: #555; }
+    .ct-line.ct-net-total {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1.5px solid #e0e0e0;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #00796b;
+    }
+
+    .ct-channel-breakdown {
+      margin: 2px 0 8px;
+      padding-left: 2px;
+      font-size: .76rem;
+      color: #888;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ct-drink-list {
+      margin: 4px 0 6px;
+      padding: 8px 12px;
+      background: #f7f5f0;
+      border-radius: 8px;
+    }
+    .ct-drink-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: .8rem;
+      color: #555;
+      padding: 2px 0;
+    }
+    .ct-hot-tag {
+      font-size: .65rem;
+      font-weight: 700;
+      color: #b45309;
+      background: #ffedd5;
+      padding: 1px 6px;
+      border-radius: 999px;
+      margin-left: 4px;
+    }
+    .ct-cookiedoh-tag {
+      font-size: .62rem;
+      font-weight: 700;
+      color: #6d4c1f;
+      background: #f7ecd3;
+      padding: 1px 5px;
+      border-radius: 999px;
+      margin-left: 4px;
+    }
+    .ct-empty-note {
+      font-size: .82rem;
+      color: #999;
+      font-style: italic;
+      padding: 6px 0;
+    }
+
+    .ct-manual-row .ct-manual-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      color: #c62828;
+      font-size: .88rem;
+    }
+    .ct-manual-input {
+      width: 80px;
+      padding: 4px 6px;
+      border: 1px solid #e0a0a0;
+      border-radius: 6px;
+      text-align: right;
+      font-size: .88rem;
+      color: #c62828;
+    }
+
+    .ct-extras-block {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #e6c780;
+    }
+    .ct-extras-title {
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      color: #8a6100;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- === SIDEBAR === -->
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+
+      <div class="nav-section">
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+          <li id="adminStockUsageLink" style="display:none;"><a href="stock-usage.html">Stock Usage</a></li>
+          <li class="active"><a href="coffee-traps.html">🧉 Coffee Traps</a></li>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- === MAIN CONTENT === -->
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>🧉 Coffee Traps Settlement</h1>
+      </header>
+
+      <div class="page-content">
+        <p class="ct-page-note">
+          Coffee Traps sells under Mintcha. Every Monday, Mintcha pays out the
+          prior Mon–Sun week's coffee sales (any drink tagged Coffee —
+          including ones sold via the Cookiedoh channel) minus cold cup/lid/
+          straw cost and ice. The last week of each month also deducts
+          rental, utilities, wifi and pest control.
+        </p>
+
+        <!-- === Next Payout (always shows the very next Monday, regardless of month browsed below) === -->
+        <div id="ctNextPayoutContainer"></div>
+
+        <div class="ct-controls-bar">
+          <div class="ct-month-nav">
+            <button id="ctPrevMonthBtn" aria-label="Previous month">◀</button>
+            <span id="ctMonthLabel"></span>
+            <button id="ctNextMonthBtn" aria-label="Next month">▶</button>
+            <button id="ctTodayBtn">This Month</button>
+          </div>
+          <div class="ct-settings-inline">
+            <label for="ctCupChargeInput">Cup/Lid/Straw charge (RM per cold cup):</label>
+            <input type="number" id="ctCupChargeInput" min="0" step="0.01" />
+          </div>
+        </div>
+
+        <div class="ct-month-total-banner">
+          <span class="label">Total Payout This Month</span>
+          <span class="value" id="ctMonthTotal">RM0.00</span>
+        </div>
+
+        <div id="ctWeeksContainer"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- === Scripts === -->
+  <script src="js/common.js"></script>
+  <script src="js/coffee-traps.js"></script>
+
+  <script>
+    const role = localStorage.getItem("mintchaRole");
+    if (role === "admin") {
+      const usageLink = document.getElementById("adminStockUsageLink");
+      if (usageLink) usageLink.style.display = "list-item";
+    }
+  </script>
+</body>
+</html>
