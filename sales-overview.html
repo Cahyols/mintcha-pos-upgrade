@@ -114,12 +114,14 @@
       <div id="paginationControls" class="pagination"></div>
     </section>
   </div>
-  <!-- === Receipt Modal (view-only, reused pattern from Order Management) === -->
+
+  <!-- === Receipt Modal (view-only, reused pattern from Order Management) ===
+       No static close button here — viewReceipt() in sales-overview.js
+       builds its own close button (#closeReceiptModal) inside
+       #receiptContent every time it renders. A leftover static one here
+       previously created a duplicate-id element that never got wired up. -->
   <div id="receiptModal" class="modal hidden">
-    
-      <span id="closeReceiptModal" class="close">&times;</span>
-      <div id="receiptContent"></div>
-    
+    <div id="receiptContent"></div>
   </div>
 
   <!-- === Import Conflicts Review Modal (Admin only) === -->

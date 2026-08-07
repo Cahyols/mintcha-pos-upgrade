@@ -8,23 +8,15 @@ let appliedDiscount = null;
 let dragSrcIndex = null;
 
 // === Category filter state (Order Management menu grid) ===
-// Defaults to "matcha" so the page opens straight into that tab.
 let activeMenuCategoryFilter = "matcha";
 
 // === Order type state (Dine In / Delivery) ===
-// Each menu item can now carry two prices: `price` (dine in) and
-// `priceDelivery` (delivery). If an item has no priceDelivery set yet,
-// it falls back to the dine-in price so old menu data keeps working.
 let activeOrderType = "dineIn"; // "dineIn" | "delivery"
 
 // === Cash payment state ===
-// Amount tendered builds up as the cashier taps denomination buttons
-// (or types a custom amount via "Others"), same as a physical cash
-// drawer workflow — not typed as one lump number.
 let cashAmountReceived = 0;
 
 // === Menu card color tagging ===
-// 5 preset colors only, kept simple — no custom color picker needed.
 const CARD_COLORS = [
   { name: "Rose",    value: "#ffcdd2" },
   { name: "Amber",   value: "#ffe0b2" },
@@ -62,6 +54,10 @@ const closeDiscountModal = document.getElementById("closeDiscountModal");
 const discountOptions = document.querySelectorAll(".discount-option");
 const removeDiscountBtn = document.getElementById("removeDiscountBtn");
 
+// Payment-option groups (Dine In vs Delivery) — toggled in proceedPayment below.
+const dineInPaymentOptions = document.getElementById("dineInPaymentOptions");
+const deliveryPaymentOptions = document.getElementById("deliveryPaymentOptions");
+
 // === Cash Payment Modal elements ===
 const cashPaymentModal = document.getElementById("cashPaymentModal");
 const closeCashModal = document.getElementById("closeCashModal");
@@ -78,8 +74,6 @@ const cashClearBtn = document.getElementById("cashClearBtn");
 const cashConfirmBtn = document.getElementById("cashConfirmBtn");
 
 // === Toast feedback, reusing the site's existing .toast/.show CSS component ===
-// Named showOrderToast (not showToast) to avoid colliding with anything
-// common.js may already define.
 let orderToastTimer = null;
 function showOrderToast(message) {
   let toast = document.getElementById("orderToast");
@@ -114,14 +108,6 @@ function getCurrentAdminMode() {
 }
 
 // === Stock availability helpers ===
-//
-// Uses the exact same name-matching + unit-conversion logic as the
-// deduction function below, so "how many can we still make" and "how much
-// gets deducted at checkout" can never disagree with each other.
-//
-// An ingredient with NO matching stock item doesn't constrain availability
-// at all (e.g. "Small Straw" may not be tracked yet) — only ingredients
-// you're actively tracking in Stock Overview can ever cause a "Sold Out".
 function getMaxMakeableFromStock(menuItem) {
   if (!Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) {
     return Infinity;
@@ -137,7 +123,7 @@ function getMaxMakeableFromStock(menuItem) {
     const stockItem = stockList.find(
       s => (s.name || "").trim().toLowerCase() === ing.name.trim().toLowerCase()
     );
-    if (!stockItem) return; // untracked ingredient — doesn't limit availability
+    if (!stockItem) return;
 
     const conv = parseFloat(stockItem.conversionValue);
     const availableInRecipeUnits = conv && conv > 0
@@ -148,11 +134,9 @@ function getMaxMakeableFromStock(menuItem) {
     maxMakeable = Math.min(maxMakeable, makeableFromThisIngredient);
   });
 
-  return maxMakeable; // stays Infinity if nothing tracked constrains it
+  return maxMakeable;
 }
 
-// Subtracts what's already sitting in the current cart, so availability
-// reflects "how many MORE can be added," not just raw stock on the shelf.
 function getRemainingAvailable(menuItem) {
   const max = getMaxMakeableFromStock(menuItem);
   if (max === Infinity) return Infinity;
@@ -161,18 +145,11 @@ function getRemainingAvailable(menuItem) {
   return max - alreadyQueued;
 }
 
-// Walks the already-rendered "view mode" cards and toggles sold-out state
-// without rebuilding the whole grid — cheap enough to call on every cart
-// change, and avoids interrupting the "just-added" animation on a card
-// that was just clicked.
 function applyAvailabilityToRenderedMenu() {
   if (!menuContainer) return;
   const cards = menuContainer.querySelectorAll(".menu-item[data-index]");
 
   cards.forEach(div => {
-    // Only "view mode" cards are click-to-add (they carry role="button");
-    // edit/reorder mode cards should stay fully interactable regardless
-    // of stock, since an admin still needs to edit/reorder sold-out drinks.
     if (div.getAttribute("role") !== "button") return;
 
     const idx = parseInt(div.dataset.index, 10);
@@ -344,8 +321,6 @@ function renderMenu(mode = "view") {
     menuContainer.appendChild(div);
   });
 
-  // Gray out / disable any card that's actually sold out, right after building
-  // the grid (only affects "view" mode cards — see the role="button" check inside).
   applyAvailabilityToRenderedMenu();
 }
 
@@ -751,8 +726,6 @@ function updateCart() {
     discountLabelEl.textContent = "";
   }
 
-  // Cart quantities affect "how much MORE stock is left" — re-check every
-  // rendered card's sold-out state whenever the cart changes.
   applyAvailabilityToRenderedMenu();
 }
 
@@ -836,20 +809,129 @@ function generateOrderId() {
 }
 
 // === Current order total helper (subtotal - discount) ===
-// Shared by the payment modal and the cash modal so both always agree on
-// what's actually owed, using the exact same discount logic as the cart.
 function getCurrentOrderTotal() {
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
   const discountAmount = calculateDiscount(cart, appliedDiscount);
   return Math.max(0, subtotal - discountAmount);
 }
 
+// === Finalize a sale for any payment method ===
+// Top-level function. Previously this was declared *inside* the
+// DOMContentLoaded handler below, which is exactly why Cash payments were
+// broken: cashConfirmBtn's click listener lives at the top level of the
+// script and had no way to see a function scoped inside that other
+// callback — clicking "Confirm Payment" silently threw
+// "finalizeSale is not defined". Everything this function touches (cart,
+// appliedDiscount, activeOrderType, receiptContent, receiptModal,
+// generateOrderId, deductStockForSaleAndLogUsage, renderMenu,
+// getCurrentAdminMode) was already top-level, so hoisting it up here is safe.
+function finalizeSale(method, cashInfo = null) {
+  try {
+    const customer = document.getElementById("customerName").value || "Walk-in";
+    const note = document.getElementById("orderNote").value;
+    const orderId = generateOrderId();
+    const now = new Date();
+    const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+    const dateStr = now.toLocaleString("en-MY", options);
+
+    const cashier = localStorage.getItem("mintchaUser") || "Unknown";
+    const orderTypeLabel = activeOrderType === "delivery" ? "Delivery" : "Dine In";
+
+    let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+    const discountAmount = calculateDiscount(cart, appliedDiscount);
+    const total = subtotal - discountAmount;
+
+    const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
+
+    const cashReceiptBlock = cashInfo ? `
+          <div><strong>Cash Received:</strong> RM${cashInfo.received.toFixed(2)}</div>
+          <div><strong>Change Given:</strong> RM${cashInfo.change.toFixed(2)}</div>
+    ` : "";
+
+    // Cookiedoh collects the money at their counter on our behalf and
+    // settles with us every Monday — flag that clearly on the receipt
+    // so the cashier/customer know this sale isn't cash-in-drawer today.
+    const cookiedohReceiptBlock = method === "Cookiedoh" ? `
+          <div><strong>Settlement:</strong> Collected by Cookiedoh — paid to Mintcha every Monday</div>
+    ` : "";
+
+    receiptContent.innerHTML = `
+      <div class="receipt-brand">🍃 Mintcha</div>
+      <div class="receipt-header">
+        <div><strong>${dateStr}</strong></div>
+        <div>Order ID: ${orderId}</div>
+        <div>Order Type: ${orderTypeLabel}</div>
+        <div>Cashier: ${cashier}</div>
+      </div>
+      <div class="receipt-body">
+        ${itemList}
+        <div><em>Note:</em> ${note || '-'}</div>
+        <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
+        <div><strong>Payment:</strong> ${method}</div>
+      </div>
+      <div class="receipt-footer">
+        <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
+        <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
+        <strong>Total:</strong> RM${total.toFixed(2)}<br>
+        ${cashReceiptBlock}
+        ${cookiedohReceiptBlock}
+        <div class="receipt-barcode"></div>
+        <div>#TeamRumput VS #TeamMint 💚</div>
+        <button id="closeReceiptModal">OK</button>
+      </div>
+    `;
+
+    const sale = {
+      id: orderId,
+      date: dateStr,
+      cashier,
+      customer,
+      note,
+      orderType: orderTypeLabel,
+      items: [...cart],
+      paymentMethod: method,
+      subtotal,
+      discountType: appliedDiscount || "None",
+      discountAmount,
+      total,
+      status: "Pending",
+      ...(cashInfo ? { cashReceived: cashInfo.received, changeGiven: cashInfo.change } : {}),
+      // Only present for Cookiedoh sales — Cookiedoh holds the cash and
+      // settles with Mintcha weekly, so these need to be tracked as
+      // outstanding until they pay up on Monday.
+      ...(method === "Cookiedoh" ? { settlementStatus: "Owed by Cookiedoh", settlementDay: "Monday" } : {})
+    };
+
+    const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+    allSales.unshift(sale);
+    localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
+
+    const depletedItems = deductStockForSaleAndLogUsage(cart);
+    if (depletedItems.length) {
+      showOrderToast(`⚠️ Now out of stock: ${depletedItems.join(", ")}`);
+    }
+
+    renderMenu(getCurrentAdminMode());
+
+    document.getElementById("closeReceiptModal").onclick = () => {
+      receiptModal.style.display = "none";
+    };
+
+    receiptModal.style.display = "flex";
+  } catch (err) {
+    console.error("Payment/save failed:", err);
+    showOrderToast("Something went wrong saving the order");
+  } finally {
+    cart = [];
+    resetDiscount();
+    updateCart();
+    document.getElementById("customerName").value = "";
+    document.getElementById("orderNote").value = "";
+    paymentModal.style.display = "none";
+  }
+}
+
 // === Cash Payment Modal ===
-// Denomination buttons ADD to the running "amount received" (like counting
-// notes onto a drawer), rather than replacing it — so a cashier can tap
-// RM50 + RM20 + RM5 to build up RM75 tendered. "Others" lets them add any
-// non-standard amount (coins, odd notes). "Exact" is a shortcut for when
-// the customer pays the precise total with no change needed.
 function updateCashModalDisplay() {
   const total = getCurrentOrderTotal();
   const balance = cashAmountReceived - total;
@@ -931,7 +1013,7 @@ closeCashModal?.addEventListener("click", () => {
 
 cashConfirmBtn?.addEventListener("click", () => {
   const total = getCurrentOrderTotal();
-  if (cashAmountReceived < total) return; // guarded by disabled state too
+  if (cashAmountReceived < total) return;
 
   const change = cashAmountReceived - total;
   finalizeSale("Cash", { received: cashAmountReceived, change });
@@ -956,126 +1038,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   proceedPayment.addEventListener("click", () => {
     if (cart.length === 0) return alert("Cart is empty!");
+
+    // Dine In: Cash/QR/eWallet/Card/Cookiedoh. Delivery: Shopee Food/Grab Food only.
+    const isDelivery = activeOrderType === "delivery";
+    dineInPaymentOptions?.classList.toggle("hidden", isDelivery);
+    deliveryPaymentOptions?.classList.toggle("hidden", !isDelivery);
+
     paymentModal.style.display = "flex";
   });
 
   closePaymentModal.addEventListener("click", () => {
     paymentModal.style.display = "none";
   });
-
-  // === Finalize a sale for any payment method ===
-  // cashInfo (only for Cash) is { received, change } and gets stamped onto
-  // the sale record + shown on the receipt so cashiers have a record of
-  // what was tendered and how much change was given.
-  function finalizeSale(method, cashInfo = null) {
-    try {
-      const customer = document.getElementById("customerName").value || "Walk-in";
-      const note = document.getElementById("orderNote").value;
-      const orderId = generateOrderId();
-      const now = new Date();
-      const options = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
-      const dateStr = now.toLocaleString("en-MY", options);
-
-      const cashier = localStorage.getItem("mintchaUser") || "Unknown";
-      const orderTypeLabel = activeOrderType === "delivery" ? "Delivery" : "Dine In";
-
-      let subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-      const discountAmount = calculateDiscount(cart, appliedDiscount);
-      const total = subtotal - discountAmount;
-
-      const itemList = cart.map(i => `<div>${i.qty} × ${i.name} - RM${(i.qty * i.price).toFixed(2)}</div>`).join('');
-
-      const cashReceiptBlock = cashInfo ? `
-            <div><strong>Cash Received:</strong> RM${cashInfo.received.toFixed(2)}</div>
-            <div><strong>Change Given:</strong> RM${cashInfo.change.toFixed(2)}</div>
-      ` : "";
-
-      // Cookiedoh collects the money at their counter on our behalf and
-      // settles with us every Monday — flag that clearly on the receipt
-      // so the cashier/customer know this sale isn't cash-in-drawer today.
-      const cookiedohReceiptBlock = method === "Cookiedoh" ? `
-            <div><strong>Settlement:</strong> Collected by Cookiedoh — paid to Mintcha every Monday</div>
-      ` : "";
-
-      receiptContent.innerHTML = `
-        <div class="receipt-brand">🍃 Mintcha</div>
-        <div class="receipt-header">
-          <div><strong>${dateStr}</strong></div>
-          <div>Order ID: ${orderId}</div>
-          <div>Order Type: ${orderTypeLabel}</div>
-          <div>Cashier: ${cashier}</div>
-        </div>
-        <div class="receipt-body">
-          ${itemList}
-          <div><em>Note:</em> ${note || '-'}</div>
-          <div><strong>Discount:</strong> ${appliedDiscount || 'None'}</div>
-          <div><strong>Payment:</strong> ${method}</div>
-        </div>
-        <div class="receipt-footer">
-          <strong>Subtotal:</strong> RM${subtotal.toFixed(2)}<br>
-          <strong>Discount:</strong> -RM${discountAmount.toFixed(2)}<br>
-          <strong>Total:</strong> RM${total.toFixed(2)}<br>
-          ${cashReceiptBlock}
-          ${cookiedohReceiptBlock}
-          <div class="receipt-barcode"></div>
-          <div>#TeamRumput VS #TeamMint 💚</div>
-          <button id="closeReceiptModal">OK</button>
-        </div>
-      `;
-
-      const sale = {
-        id: orderId,
-        date: dateStr,
-        cashier,
-        customer,
-        note,
-        orderType: orderTypeLabel,
-        items: [...cart],
-        paymentMethod: method,
-        subtotal,
-        discountType: appliedDiscount || "None",
-        discountAmount,
-        total,
-        status: "Pending",
-        // Only present for Cash payments — omitted entirely for QR/eWallet/Card
-        ...(cashInfo ? { cashReceived: cashInfo.received, changeGiven: cashInfo.change } : {}),
-        // Only present for Cookiedoh sales — Cookiedoh holds the cash and
-        // settles with Mintcha weekly, so these need to be tracked as
-        // outstanding until they pay up on Monday.
-        ...(method === "Cookiedoh" ? { settlementStatus: "Owed by Cookiedoh", settlementDay: "Monday" } : {})
-      };
-
-      const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
-      allSales.unshift(sale);
-      localStorage.setItem("mintcha_sales", JSON.stringify(allSales));
-
-      // === Deduct stock + log ingredient usage for this sale ===
-      const depletedItems = deductStockForSaleAndLogUsage(cart);
-      if (depletedItems.length) {
-        showOrderToast(`⚠️ Now out of stock: ${depletedItems.join(", ")}`);
-      }
-
-      // Re-render the menu grid immediately so sold-out cards reflect the
-      // post-sale stock levels for the next order.
-      renderMenu(getCurrentAdminMode());
-
-      document.getElementById("closeReceiptModal").onclick = () => {
-        receiptModal.style.display = "none";
-      };
-
-      receiptModal.style.display = "flex";
-    } catch (err) {
-      console.error("Payment/save failed:", err);
-      showOrderToast("Something went wrong saving the order");
-    } finally {
-      cart = [];
-      resetDiscount();
-      updateCart();
-      document.getElementById("customerName").value = "";
-      document.getElementById("orderNote").value = "";
-      paymentModal.style.display = "none";
-    }
-  }
 
   paymentButtons.forEach(button => {
     button.addEventListener("click", () => {

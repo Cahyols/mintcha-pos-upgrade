@@ -595,17 +595,26 @@
     </section>
   </div>
 
-  <!-- === Payment Modal === -->
+  <!-- === Payment Modal ===
+       Two option groups: Dine In (Cash/QR/eWallet/Card/Cookiedoh) and
+       Delivery (Shopee Food/Grab Food). order-management.js shows/hides
+       the correct one based on activeOrderType each time this modal opens. -->
   <div id="paymentModal" class="modal hidden">
     <div class="modal-content">
       <span id="closePaymentModal" class="close">&times;</span>
       <h3>Select Payment Method</h3>
-      <div class="payment-options">
+
+      <div class="payment-options" id="dineInPaymentOptions">
         <button class="payment-btn" data-method="Cash">💵 Cash</button>
         <button class="payment-btn" data-method="QR Code">📱 QR Code</button>
         <button class="payment-btn" data-method="TNG eWallet">🧧 TNG eWallet</button>
         <button class="payment-btn" data-method="Card">💳 Card</button>
         <button class="payment-btn payment-cookiedoh" data-method="Cookiedoh">🍪 Cookiedoh (settles Mon)</button>
+      </div>
+
+      <div class="payment-options hidden" id="deliveryPaymentOptions">
+        <button class="payment-btn" data-method="Shopee Food">🛍️ Shopee Food</button>
+        <button class="payment-btn" data-method="Grab Food">🚗 Grab Food</button>
       </div>
     </div>
   </div>
