@@ -1,4 +1,4 @@
-console.log("[dashboard.js] v5 loaded — Cookiedoh sales split out + servings-based low stock alerts + auth guard active");
+console.log("[dashboard.js] v6 loaded — Shopee/Grab delivery split + Cookiedoh sales split out + servings-based low stock alerts + auth guard active");
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireAuth()) return;
@@ -278,7 +278,9 @@ document.addEventListener("DOMContentLoaded", () => {
     coffee: "Coffee",
     dessert: "Dessert",
     uncategorized: "Uncategorized",
-    cookiedoh: "🍪 Cookiedoh"
+    cookiedoh: "🍪 Cookiedoh",
+    shopee: "🛍️ Shopee Food",
+    grab: "🚗 Grab Food"
   };
 
   // A sale is a Cookiedoh sale if Cookiedoh collected the payment for it —
@@ -288,6 +290,30 @@ document.addEventListener("DOMContentLoaded", () => {
   // and this number can be tallied 1:1 against what Cookiedoh reports.
   function isCookiedohSale(sale) {
     return sale.paymentMethod === "Cookiedoh";
+  }
+
+  // Delivery sales are paid via one of the two platform-specific payment
+  // methods set in order-management.js's Delivery payment options ("Shopee
+  // Food" / "Grab Food"). Tracked separately for the same reason as
+  // Cookiedoh above — so each platform's cups/revenue can be reconciled
+  // against what that platform actually reports/settles, without those
+  // drinks also showing up under Matcha/Coffee/Dessert.
+  function isShopeeSale(sale) {
+    return sale.paymentMethod === "Shopee Food";
+  }
+
+  function isGrabSale(sale) {
+    return sale.paymentMethod === "Grab Food";
+  }
+
+  // Single source of truth for which bucket a sale's items get tallied
+  // under. Order matters only in that these are mutually exclusive payment
+  // methods, so at most one of these will ever be true for a given sale.
+  function getSaleBucket(sale, meta) {
+    if (isCookiedohSale(sale)) return "cookiedoh";
+    if (isShopeeSale(sale)) return "shopee";
+    if (isGrabSale(sale)) return "grab";
+    return meta.category;
   }
 
   function renderHourlyReport(rangeSales, mode) {
@@ -333,8 +359,6 @@ document.addEventListener("DOMContentLoaded", () => {
       bucket.transactions += 1;
       bucket.discount += parseFloat(sale.discountAmount || 0);
 
-      const saleIsCookiedoh = isCookiedohSale(sale);
-
       (sale.items || []).forEach(item => {
         // Add-ons aren't a cup — don't count them toward the 🥤 cup tally
         // or the per-category cup counts, even though they're still a
@@ -345,9 +369,8 @@ document.addEventListener("DOMContentLoaded", () => {
         bucket.cups += qty;
 
         const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
-        const cat = saleIsCookiedoh
-          ? "cookiedoh"
-          : (CATEGORY_DISPLAY_NAMES[meta.category] ? meta.category : "uncategorized");
+        const rawCat = getSaleBucket(sale, meta);
+        const cat = CATEGORY_DISPLAY_NAMES[rawCat] ? rawCat : "uncategorized";
         bucket.categoryCups[cat] = (bucket.categoryCups[cat] || 0) + qty;
       });
     });
@@ -440,86 +463,90 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Category breakdown setup (now includes per-drink counts within each category)
     const menuCategoryMap = loadMenuCategoryMap();
-   const categoryTotals = {
-  matcha:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
-  coffee:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
-  dessert: { cups: 0, revenue: 0, discount: 0, drinks: {} },
-  uncategorized: { cups: 0, revenue: 0, discount: 0, drinks: {} },
-  // Sales collected by Cookiedoh (see isCookiedohSale) — kept separate so
-  // it can be tallied against what Cookiedoh reports collecting, and so
-  // those drinks don't get double-listed under Matcha/Coffee/Dessert too.
-  cookiedoh: { cups: 0, revenue: 0, discount: 0, drinks: {} }
-};
+    const categoryTotals = {
+      matcha:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
+      coffee:  { cups: 0, revenue: 0, discount: 0, drinks: {} },
+      dessert: { cups: 0, revenue: 0, discount: 0, drinks: {} },
+      uncategorized: { cups: 0, revenue: 0, discount: 0, drinks: {} },
+      // Sales collected by Cookiedoh (see isCookiedohSale) — kept separate so
+      // it can be tallied against what Cookiedoh reports collecting, and so
+      // those drinks don't get double-listed under Matcha/Coffee/Dessert too.
+      cookiedoh: { cups: 0, revenue: 0, discount: 0, drinks: {} },
+      // Delivery sales, split by platform so each can be reconciled against
+      // that platform's own settlement report. Never overlaps with the
+      // dine-in categories above or with Cookiedoh.
+      shopee: { cups: 0, revenue: 0, discount: 0, drinks: {} },
+      grab: { cups: 0, revenue: 0, discount: 0, drinks: {} }
+    };
 
-   rangeSales.forEach(sale => {
-  totalRevenue += parseFloat(sale.total || 0);
-  totalSubtotal += parseFloat(sale.subtotal || 0);
-  totalDiscountAmount += parseFloat(sale.discountAmount || 0);
-  // Add-ons (e.g. "+matcha", "+milk") are excluded from the cup count for
-  // this sale — a 1-cup order with an add-on is still 1 cup, not 2.
-  const cupsInSale = (sale.items || []).reduce((sum, i) => {
-    if (isAddOn(i.name)) return sum;
-    return sum + (i.qty || 0);
-  }, 0);
+    rangeSales.forEach(sale => {
+      totalRevenue += parseFloat(sale.total || 0);
+      totalSubtotal += parseFloat(sale.subtotal || 0);
+      totalDiscountAmount += parseFloat(sale.discountAmount || 0);
+      // Add-ons (e.g. "+matcha", "+milk") are excluded from the cup count for
+      // this sale — a 1-cup order with an add-on is still 1 cup, not 2.
+      const cupsInSale = (sale.items || []).reduce((sum, i) => {
+        if (isAddOn(i.name)) return sum;
+        return sum + (i.qty || 0);
+      }, 0);
 
-  if (sale.discountType === "Free") {
-    freeCups += cupsInSale;
-    totalFreeValue += parseFloat(sale.subtotal || 0);
-  } else if (sale.discountType && sale.discountType !== "None") {
-    discountedCups += cupsInSale;
-  } else {
-    paidCups += cupsInSale;
-  }
+      if (sale.discountType === "Free") {
+        freeCups += cupsInSale;
+        totalFreeValue += parseFloat(sale.subtotal || 0);
+      } else if (sale.discountType && sale.discountType !== "None") {
+        discountedCups += cupsInSale;
+      } else {
+        paidCups += cupsInSale;
+      }
 
-  // === First pass: bucket this sale's actual line totals by category ===
-  // Uses the current menu price as the reference price for splitting a sale's
-  // subtotal/discount across categories. We fall back to it (rather than only
-  // item.price) because imported sales never carry a per-item price — the
-  // XLSX "Items" column only stores qty × name, so item.price is always 0
-  // for those. Without this fallback, saleCategorySubtotal comes out as 0
-  // for every category on an imported sale, and the proportional discount
-  // split below always divides out to 0 — category boxes would show
-  // "-RM0.00 discount" even though the sale-level total is correct.
-  // (This does mean the split uses today's price, not the price actually
-  // sold at, if the menu price has since changed — acceptable since it's
-  // only used to apportion the discount, not to total up revenue.)
-  const saleCategorySubtotal = {};
-  const saleIsCookiedoh = isCookiedohSale(sale);
-  (sale.items || []).forEach(item => {
-    const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
-    // Cookiedoh sales are tallied on their own — never split back into
-    // Matcha/Coffee/Dessert/Uncategorized, so nothing gets counted twice.
-    const cat = saleIsCookiedoh
-      ? "cookiedoh"
-      : (categoryTotals[meta.category] ? meta.category : "uncategorized");
-    const qty = item.qty || 0;
-    const lineTotal = (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
+      // === First pass: bucket this sale's actual line totals by category ===
+      // Uses the current menu price as the reference price for splitting a sale's
+      // subtotal/discount across categories. We fall back to it (rather than only
+      // item.price) because imported sales never carry a per-item price — the
+      // XLSX "Items" column only stores qty × name, so item.price is always 0
+      // for those. Without this fallback, saleCategorySubtotal comes out as 0
+      // for every category on an imported sale, and the proportional discount
+      // split below always divides out to 0 — category boxes would show
+      // "-RM0.00 discount" even though the sale-level total is correct.
+      // (This does mean the split uses today's price, not the price actually
+      // sold at, if the menu price has since changed — acceptable since it's
+      // only used to apportion the discount, not to total up revenue.)
+      const saleCategorySubtotal = {};
+      (sale.items || []).forEach(item => {
+        const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
+        // Cookiedoh / Shopee Food / Grab Food sales are tallied on their
+        // own — never split back into Matcha/Coffee/Dessert/Uncategorized,
+        // so nothing gets counted twice.
+        const rawCat = getSaleBucket(sale, meta);
+        const cat = categoryTotals[rawCat] ? rawCat : "uncategorized";
+        const qty = item.qty || 0;
+        const lineTotal = (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
 
-    // Add-ons still count toward revenue and still get LISTED in the
-    // category's drink breakdown (so "+matcha" shows up under Matcha),
-    // but they must NOT add to the "cups" count — that's what drives
-    // Total Transaction / Full-Price / Discounted / Free upstream.
-    if (!isAddOn(item.name)) {
-      categoryTotals[cat].cups += qty;
-    }
-    categoryTotals[cat].revenue += (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
-    categoryTotals[cat].drinks[item.name] = (categoryTotals[cat].drinks[item.name] || 0) + qty;
+        // Add-ons still count toward revenue and still get LISTED in the
+        // category's drink breakdown (so "+matcha" shows up under Matcha),
+        // but they must NOT add to the "cups" count — that's what drives
+        // Total Transaction / Full-Price / Discounted / Free upstream.
+        if (!isAddOn(item.name)) {
+          categoryTotals[cat].cups += qty;
+        }
+        categoryTotals[cat].revenue += (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
+        categoryTotals[cat].drinks[item.name] = (categoryTotals[cat].drinks[item.name] || 0) + qty;
 
-    saleCategorySubtotal[cat] = (saleCategorySubtotal[cat] || 0) + lineTotal;
-  });
+        saleCategorySubtotal[cat] = (saleCategorySubtotal[cat] || 0) + lineTotal;
+      });
 
-  // === Second pass: spread this sale's discount across categories,
-  // proportional to how much of the sale's subtotal each category made up ===
-  const saleSubtotal = parseFloat(sale.subtotal || 0);
-  const saleDiscount = parseFloat(sale.discountAmount || 0);
-  const saleCategorySubtotalSum = Object.values(saleCategorySubtotal).reduce((a, b) => a + b, 0);
-  if (saleCategorySubtotalSum > 0 && saleDiscount > 0) {
-    Object.entries(saleCategorySubtotal).forEach(([cat, catSubtotal]) => {
-      const share = (catSubtotal / saleCategorySubtotalSum) * saleDiscount;
-      categoryTotals[cat].discount += share;
+      // === Second pass: spread this sale's discount across categories,
+      // proportional to how much of the sale's subtotal each category made up ===
+      const saleSubtotal = parseFloat(sale.subtotal || 0);
+      const saleDiscount = parseFloat(sale.discountAmount || 0);
+      const saleCategorySubtotalSum = Object.values(saleCategorySubtotal).reduce((a, b) => a + b, 0);
+      if (saleCategorySubtotalSum > 0 && saleDiscount > 0) {
+        Object.entries(saleCategorySubtotal).forEach(([cat, catSubtotal]) => {
+          const share = (catSubtotal / saleCategorySubtotalSum) * saleDiscount;
+          categoryTotals[cat].discount += share;
+        });
+      }
     });
-  }
-});
 
     const totalCups = paidCups + freeCups + discountedCups;
 
@@ -603,6 +630,24 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="category-sub">RM${categoryTotals.cookiedoh.revenue.toFixed(2)}</span>
             ${categoryTotals.cookiedoh.discount > 0 ? `<span class="category-discount">-RM${categoryTotals.cookiedoh.discount.toFixed(2)} discount</span>` : ""}
             ${renderCategoryDrinksList(categoryTotals.cookiedoh.drinks)}
+          </div>
+        ` : ""}
+        ${categoryTotals.shopee.cups > 0 ? `
+          <div class="category-box cat-shopee">
+            <span class="cat-badge cat-shopee">🛍️ Shopee Food</span>
+            <span class="category-cups">${categoryTotals.shopee.cups}</span>
+            <span class="category-sub">RM${categoryTotals.shopee.revenue.toFixed(2)}</span>
+            ${categoryTotals.shopee.discount > 0 ? `<span class="category-discount">-RM${categoryTotals.shopee.discount.toFixed(2)} discount</span>` : ""}
+            ${renderCategoryDrinksList(categoryTotals.shopee.drinks)}
+          </div>
+        ` : ""}
+        ${categoryTotals.grab.cups > 0 ? `
+          <div class="category-box cat-grab">
+            <span class="cat-badge cat-grab">🚗 Grab Food</span>
+            <span class="category-cups">${categoryTotals.grab.cups}</span>
+            <span class="category-sub">RM${categoryTotals.grab.revenue.toFixed(2)}</span>
+            ${categoryTotals.grab.discount > 0 ? `<span class="category-discount">-RM${categoryTotals.grab.discount.toFixed(2)} discount</span>` : ""}
+            ${renderCategoryDrinksList(categoryTotals.grab.drinks)}
           </div>
         ` : ""}
         ${categoryTotals.uncategorized.cups > 0 ? `
