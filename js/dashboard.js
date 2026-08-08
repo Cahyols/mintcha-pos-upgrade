@@ -65,7 +65,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const menuItems = loadMenuItemsRaw();
     const map = {};
     menuItems.forEach(item => {
-      map[item.name] = { category: item.category || "uncategorized", price: item.price || 0 };
+      const dineInPrice = parseFloat(item.price) || 0;
+      const deliveryPriceRaw = parseFloat(item.priceDelivery);
+      map[item.name] = {
+        category: item.category || "uncategorized",
+        price: dineInPrice,
+        // Falls back to dine-in price if this item never had a separate
+        // delivery price set on the Menu Recipes page.
+        priceDelivery: !isNaN(deliveryPriceRaw) ? deliveryPriceRaw : dineInPrice
+      };
     });
     return map;
   }
@@ -316,6 +324,34 @@ document.addEventListener("DOMContentLoaded", () => {
     return meta.category;
   }
 
+  // Resolve the price to use for a single line item within a sale, for the
+  // Dashboard's revenue / discount-split math.
+  //
+  // Priority:
+  //   1. The price actually stored on the sale's line item (item.price).
+  //      This is what the customer was really charged at checkout —
+  //      order-management.js already resolves Dine In vs Delivery pricing
+  //      via getItemPrice() before the sale is saved, so a Shopee/Grab
+  //      sale's item.price is already the correct delivery price.
+  //   2. Only if that's missing/zero — which happens for older sales
+  //      imported via XLSX, since the "Items" column only stores qty × name
+  //      and never a price (see sales-overview.js's import) — fall back to
+  //      the CURRENT menu price for the CORRECT order type of this sale
+  //      (Delivery vs Dine In), instead of always defaulting to dine-in.
+  //      Without checking order type here, every Shopee/Grab (and any
+  //      Delivery) sale missing a stored price would silently show the
+  //      dine-in price instead of the delivery price.
+  function resolveLineItemPrice(sale, item, menuCategoryMap) {
+    const storedPrice = parseFloat(item.price);
+    if (!isNaN(storedPrice) && storedPrice > 0) return storedPrice;
+
+    const meta = menuCategoryMap[item.name];
+    if (!meta) return 0;
+
+    const isDeliverySale = sale.orderType === "Delivery" || isShopeeSale(sale) || isGrabSale(sale);
+    return isDeliverySale ? (meta.priceDelivery ?? meta.price ?? 0) : (meta.price ?? 0);
+  }
+
   function renderHourlyReport(rangeSales, mode) {
     const card = document.getElementById("hourlyReportCard");
     const content = document.getElementById("hourlyReportContent");
@@ -500,17 +536,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // === First pass: bucket this sale's actual line totals by category ===
-      // Uses the current menu price as the reference price for splitting a sale's
-      // subtotal/discount across categories. We fall back to it (rather than only
-      // item.price) because imported sales never carry a per-item price — the
-      // XLSX "Items" column only stores qty × name, so item.price is always 0
-      // for those. Without this fallback, saleCategorySubtotal comes out as 0
-      // for every category on an imported sale, and the proportional discount
-      // split below always divides out to 0 — category boxes would show
-      // "-RM0.00 discount" even though the sale-level total is correct.
-      // (This does mean the split uses today's price, not the price actually
-      // sold at, if the menu price has since changed — acceptable since it's
-      // only used to apportion the discount, not to total up revenue.)
+      // Uses resolveLineItemPrice() as the reference price for splitting a
+      // sale's subtotal/discount across categories: the price actually
+      // stored on the sale line (which already reflects Dine In vs
+      // Delivery pricing) if present, otherwise the CURRENT menu price for
+      // the matching order type. The menu-price fallback only kicks in for
+      // older sales imported via XLSX, since that import's "Items" column
+      // only stores qty × name, so item.price is 0 for those — without a
+      // fallback, saleCategorySubtotal would come out as 0 for every
+      // category on an imported sale, and the proportional discount split
+      // below would always divide out to 0 ("-RM0.00 discount" shown even
+      // though the sale-level total is correct).
+      // (For imported sales this does mean the split uses today's menu
+      // price, not the price actually sold at, if it's since changed —
+      // acceptable since it's only used to apportion the discount, not to
+      // total up revenue.)
       const saleCategorySubtotal = {};
       (sale.items || []).forEach(item => {
         const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
@@ -520,7 +560,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const rawCat = getSaleBucket(sale, meta);
         const cat = categoryTotals[rawCat] ? rawCat : "uncategorized";
         const qty = item.qty || 0;
-        const lineTotal = (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
+        const linePrice = resolveLineItemPrice(sale, item, menuCategoryMap);
+        const lineTotal = linePrice * qty;
 
         // Add-ons still count toward revenue and still get LISTED in the
         // category's drink breakdown (so "+matcha" shows up under Matcha),
@@ -529,7 +570,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!isAddOn(item.name)) {
           categoryTotals[cat].cups += qty;
         }
-        categoryTotals[cat].revenue += (menuCategoryMap[item.name]?.price ?? item.price ?? 0) * qty;
+        categoryTotals[cat].revenue += lineTotal;
         categoryTotals[cat].drinks[item.name] = (categoryTotals[cat].drinks[item.name] || 0) + qty;
 
         saleCategorySubtotal[cat] = (saleCategorySubtotal[cat] || 0) + lineTotal;
