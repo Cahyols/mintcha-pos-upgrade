@@ -1098,3 +1098,20 @@ body.sidebar-open {
   gap: 10px;
   margin-top: 16px;
 }
+
+/* ============================================================
+   DASHBOARD — DELIVERY CATEGORY BOXES (Shopee Food / Grab Food)
+   ============================================================
+   Matches the pattern used for .category-box.cat-cookiedoh /
+   .cat-badge.cat-cookiedoh in the inline <style> block on
+   dashboard.html, just with each platform's own brand-ish accent
+   color so the two delivery boxes are recognizable at a glance
+   next to Matcha/Coffee/Dessert/Cookiedoh. Referenced by the
+   "🛍️ Shopee Food" / "🚗 Grab Food" category boxes rendered in
+   js/dashboard.js's renderSummaryForRange().
+   ============================================================ */
+.category-box.cat-shopee { background: #ffe6dc; border: 1px solid #ee4d2d; }
+.cat-badge.cat-shopee { background: rgba(255,255,255,.7); color: #c73e1d; }
+
+.category-box.cat-grab { background: #dcf5e6; border: 1px solid #00b14f; }
+.cat-badge.cat-grab { background: rgba(255,255,255,.7); color: #00713a; }
