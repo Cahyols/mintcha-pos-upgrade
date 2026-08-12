@@ -526,6 +526,24 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // === FIX: normalize to the app-wide "DD/MM/YYYY HH:MM" date format ===
+    // <input type="datetime-local"> gives back "YYYY-MM-DDTHH:MM" (ISO-ish).
+    // Every other place a sale gets created/repaired (checkout, XLSX import,
+    // fixCorruptedDates) stores dates as "DD/MM/YYYY HH:MM". dashboard.js has
+    // its own separate copy of parseDateSafe() that — unlike the one in this
+    // file — has NO ISO-format check, so it falls straight into a day-first
+    // regex. Fed a raw ISO string like "2026-08-11T14:30", that regex doesn't
+    // fail; it accidentally matches "26-08-11T14:30" as day=26/month=08/
+    // year=2011. The sale saves fine, it just silently gets dated to
+    // 26 Aug 2011 and disappears from every Dashboard range (Today's Summary,
+    // Low Stock recompute triggers, etc.) even though it's sitting correctly
+    // in mintcha_sales and shows up fine on this page. Converting it here,
+    // once, at save time keeps the stored format consistent everywhere
+    // instead of having to patch every reader.
+    const [dPart, tPart] = dateTimeValue.split("T");
+    const [yyyy, mm, dd] = dPart.split("-");
+    const formattedDateTime = `${dd}/${mm}/${yyyy} ${tPart}`;
+
     const itemRows = document.querySelectorAll("#saleItemsContainer .sale-item-row");
     const items = [];
     itemRows.forEach(row => {
@@ -549,7 +567,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const sale = {
       id: generateNextOrderId(),
-      date: dateTimeValue,
+      date: formattedDateTime,
       cashier: document.getElementById("saleCashier").value.trim(),
       customer: document.getElementById("saleCustomer").value.trim() || "Walk-in",
       items,
