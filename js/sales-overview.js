@@ -70,6 +70,43 @@ function sortSalesByDateDesc(sales) {
   });
 }
 
+// === Menu items helper (shared by the Add Sale item dropdowns) ===
+function getMenuItemsList() {
+  try {
+    return JSON.parse(localStorage.getItem("menuItems") || "[]");
+  } catch (err) {
+    return [];
+  }
+}
+
+function populateItemNameSelect(selectEl, selectedValue) {
+  if (!selectEl) return;
+  const menuItems = getMenuItemsList();
+  selectEl.innerHTML = '<option value="">Select item...</option>';
+  menuItems.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.name;
+    opt.textContent = m.price != null ? `${m.name} - RM${parseFloat(m.price).toFixed(2)}` : m.name;
+    opt.dataset.price = m.price ?? "";
+    selectEl.appendChild(opt);
+  });
+  if (selectedValue) selectEl.value = selectedValue;
+
+  if (!selectEl.dataset.wired) {
+    selectEl.dataset.wired = "true";
+    selectEl.addEventListener("change", () => {
+      const row = selectEl.closest(".sale-item-row");
+      if (!row) return;
+      const priceInput = row.querySelector(".item-price");
+      const selectedOption = selectEl.options[selectEl.selectedIndex];
+      const price = selectedOption ? selectedOption.dataset.price : "";
+      if (priceInput && price !== "") {
+        priceInput.value = parseFloat(price).toFixed(2);
+      }
+    });
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const tableBody = document.getElementById("salesTableBody");
   const pageSize = 50;
@@ -487,7 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const firstRow = itemsContainer.querySelector(".sale-item-row");
     if (firstRow) {
       firstRow.querySelector(".item-qty").value = 1;
-      firstRow.querySelector(".item-name").value = "";
+      populateItemNameSelect(firstRow.querySelector(".item-name"), "");
       firstRow.querySelector(".item-price").value = "";
     }
 
@@ -507,10 +544,11 @@ document.addEventListener("DOMContentLoaded", () => {
     row.className = "sale-item-row";
     row.innerHTML = `
       <input type="number" min="1" class="item-qty" placeholder="Qty" value="1" />
-      <input type="text" class="item-name" placeholder="Item name" />
+      <select class="item-name"></select>
       <input type="number" min="0" step="0.01" class="item-price" placeholder="Price (RM)" />
       <button type="button" class="remove-item-row-btn">✕</button>
     `;
+    populateItemNameSelect(row.querySelector(".item-name"));
     row.querySelector(".remove-item-row-btn").onclick = () => row.remove();
     itemsContainer.appendChild(row);
   }
@@ -556,7 +594,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (items.length === 0) {
-      alert("Please add at least one item with a name and quantity.");
+      alert("Please select at least one item and set its quantity.");
       return;
     }
 
