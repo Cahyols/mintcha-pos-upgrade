@@ -570,6 +570,39 @@
       color: #c62828;
     }
     #restoreBackupTriggerBtn:hover { background: #fdecec; }
+
+    /* === Data Maintenance (renamed-item fix) === */
+    #dataMaintenanceCard .maintenance-body {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    #dataMaintenanceCard p {
+      font-size: .82rem;
+      color: #666;
+      margin: 0;
+      max-width: 520px;
+    }
+    #fixRenamedItemsBtn {
+      background: #fff;
+      border: 1px solid #6d4c1f;
+      color: #6d4c1f;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: .85rem;
+      white-space: nowrap;
+    }
+    #fixRenamedItemsBtn:hover { background: #f7ecd3; }
+    #fixRenamedItemsResult {
+      font-size: .78rem;
+      color: #2e7d32;
+      margin-top: 8px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -660,6 +693,26 @@
               <input type="file" id="restoreBackupInput" accept=".json" style="display:none" />
             </div>
           </div>
+        </section>
+
+        <!-- === Data Maintenance: Fix Renamed Menu Items (Admin only) === -->
+        <!-- One-time-use tool. If a drink on Menu Recipes gets renamed (e.g.
+             "Mintcha Bloom" -> "Mintcha Bloom (MB)"), older sales still have
+             the OLD name stored on each line item. Since the Dashboard's
+             category breakdown looks items up by exact name match against
+             the current menu, those older sales fall into "Uncategorized"
+             instead of their real category. This button re-scans all past
+             sales, derives old->new name pairs by stripping the trailing
+             " (CODE)" off each current menu item's name, downloads a backup
+             of mintcha_sales first, then rewrites any matching old names to
+             the current name so they slot back under the right category. -->
+        <section id="dataMaintenanceCard" class="dashboard-card" style="display:none;">
+          <h3>🔧 Data Maintenance</h3>
+          <div class="maintenance-body">
+            <p>If a menu item was renamed (e.g. a code added like "(MB)"), older sales may still show the old name and fall under Uncategorized. This scans past sales and updates old names to match the current menu. A backup downloads automatically before anything changes.</p>
+            <button id="fixRenamedItemsBtn">🔧 Fix Renamed Items</button>
+          </div>
+          <div id="fixRenamedItemsResult"></div>
         </section>
       </div>
     </section>

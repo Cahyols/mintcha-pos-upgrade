@@ -1,4 +1,4 @@
-console.log("[dashboard.js] v6 loaded — Shopee/Grab delivery split + Cookiedoh sales split out + servings-based low stock alerts + auth guard active");
+console.log("[dashboard.js] v7 loaded — Shopee/Grab delivery split + Cookiedoh sales split out + servings-based low stock alerts + renamed-item fix tool + auth guard active");
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireAuth()) return;
@@ -203,6 +203,128 @@ document.addEventListener("DOMContentLoaded", () => {
         </li>
       `;
     }).join("");
+  }
+
+  // ===================================================================
+  // === Data Maintenance: Fix Renamed Menu Items (Admin only) ===
+  // ===================================================================
+  //
+  // Problem: when a drink on Menu Recipes gets renamed (e.g. "Mintcha
+  // Bloom" -> "Mintcha Bloom (MB)"), sales recorded BEFORE the rename still
+  // have the OLD name stored on their line items. The category breakdown
+  // above looks up each sale item's category by exact name match against
+  // the CURRENT menu (loadMenuCategoryMap), so those older sales silently
+  // fall into "Uncategorized" instead of their real category.
+  //
+  // Fix: derive old name -> new name pairs by stripping a trailing
+  // " (CODE)" off each current menu item's name, then rewrite any matching
+  // old names found in mintcha_sales to the current name. A backup of
+  // mintcha_sales downloads automatically first. Safe to run more than
+  // once — items that already match the current name are simply skipped.
+
+  function buildMenuRenameMap() {
+    const menu = loadMenuItemsRaw();
+    const renameMap = {}; // oldName -> newName
+    menu.forEach(item => {
+      const oldName = String(item.name || "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+      if (oldName && oldName !== item.name) {
+        renameMap[oldName] = item.name;
+      }
+    });
+    return renameMap;
+  }
+
+  function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function fixRenamedItems() {
+    const resultEl = document.getElementById("fixRenamedItemsResult");
+    const renameMap = buildMenuRenameMap();
+
+    if (!Object.keys(renameMap).length) {
+      if (resultEl) {
+        resultEl.style.display = "block";
+        resultEl.style.color = "#666";
+        resultEl.textContent = "No renamed menu items detected (no current menu name has a trailing \"(CODE)\" that differs from a base name).";
+      }
+      return;
+    }
+
+    const sales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
+
+    // Count first, so the confirm dialog is informative instead of blind
+    const counts = {};
+    sales.forEach(sale => {
+      (sale.items || []).forEach(item => {
+        if (renameMap[item.name]) {
+          counts[item.name] = (counts[item.name] || 0) + (item.qty || 1);
+        }
+      });
+    });
+
+    const affectedNames = Object.keys(counts);
+    if (!affectedNames.length) {
+      if (resultEl) {
+        resultEl.style.display = "block";
+        resultEl.style.color = "#666";
+        resultEl.textContent = "Nothing to fix — no past sales use an old (pre-rename) item name.";
+      }
+      return;
+    }
+
+    const summaryLines = affectedNames
+      .map(name => `  "${name}" → "${renameMap[name]}"  (${counts[name]} line-item${counts[name] === 1 ? "" : "s"})`)
+      .join("\n");
+
+    const confirmed = confirm(
+      `This will update the following old item names in your sales history:\n\n${summaryLines}\n\n` +
+      `A backup of your current sales data will download automatically first.\n\nProceed?`
+    );
+    if (!confirmed) return;
+
+    // Backup before touching anything
+    downloadJSON(sales, `mintcha_sales_backup_${Date.now()}.json`);
+
+    let changed = 0;
+    sales.forEach(sale => {
+      (sale.items || []).forEach(item => {
+        if (renameMap[item.name]) {
+          item.name = renameMap[item.name];
+          changed++;
+        }
+      });
+    });
+
+    localStorage.setItem("mintcha_sales", JSON.stringify(sales));
+
+    if (resultEl) {
+      resultEl.style.display = "block";
+      resultEl.style.color = "#2e7d32";
+      resultEl.textContent = `Done — ${changed} line-item${changed === 1 ? "" : "s"} updated. Refreshing dashboard…`;
+    }
+
+    // Re-render everything so the fix is visible immediately
+    refreshDashboardData();
+  }
+
+  function setupDataMaintenance() {
+    const role = localStorage.getItem("mintchaRole");
+    const card = document.getElementById("dataMaintenanceCard");
+    const btn = document.getElementById("fixRenamedItemsBtn");
+    if (!card) return;
+
+    if (role === "admin") {
+      card.style.display = "block";
+    }
+
+    btn?.addEventListener("click", fixRenamedItems);
   }
 
   // ===================================================================
@@ -788,6 +910,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   setupSummaryDatePicker();
+  setupDataMaintenance();
   refreshDashboardData();
 
   // === Keep the Dashboard live instead of "correct only at the moment it
