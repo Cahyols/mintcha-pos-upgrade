@@ -152,71 +152,101 @@
     </div>
   </div>
 
+  <!-- === Add Sale (Manual Entry) Modal — redesigned layout ===
+       Same field ids as before so sales-overview.js works unchanged;
+       just regrouped into sections + a live total preview. Styling
+       lives in css/addsale-modal.css, scoped under .sale-modal so it
+       won't affect any other page. -->
   <div id="addSaleModal" class="modal hidden">
-    <div class="modal-content">
-      <span id="closeAddSaleModal" class="close">&times;</span>
-      <h2>➕ Add Sale (Manual Entry)</h2>
+    <div class="modal-content sale-modal">
+      <div class="sale-modal-header">
+        <h2>➕ Add Sale</h2>
+        <span id="closeAddSaleModal" class="close">&times;</span>
+      </div>
 
-      <label>Date &amp; Time:
-        <input type="datetime-local" id="saleDateTime" />
-      </label>
+      <div class="sale-modal-body">
+        <div class="form-section">
+          <p class="form-section-title">Order Details</p>
+          <div class="form-grid">
+            <label>Date &amp; Time
+              <input type="datetime-local" id="saleDateTime" />
+            </label>
+            <label>Payment Method
+              <select id="salePayment">
+                <option value="Cash">Cash</option>
+                <option value="QR">QR</option>
+                <option value="Ewallet">Ewallet</option>
+                <option value="Card">Card</option>
+              </select>
+            </label>
+            <label>Cashier
+              <input type="text" id="saleCashier" placeholder="e.g. admin" />
+            </label>
+            <label>Customer
+              <input type="text" id="saleCustomer" placeholder="Walk-in" />
+            </label>
+          </div>
+        </div>
 
-      <label>Cashier:
-        <input type="text" id="saleCashier" placeholder="e.g. admin" />
-      </label>
+        <div class="form-section">
+          <p class="form-section-title">Items</p>
+          <div class="item-rows-head">
+            <span>Qty</span>
+            <span>Item</span>
+            <span>Price (RM)</span>
+            <span></span>
+          </div>
+          <div id="saleItemsContainer">
+            <div class="sale-item-row">
+              <input type="number" min="1" class="item-qty" placeholder="Qty" value="1" />
+              <select class="item-name">
+                <option value="">Select item...</option>
+              </select>
+              <input type="number" min="0" step="0.01" class="item-price" placeholder="0.00" />
+            </div>
+          </div>
+          <button type="button" id="addItemRowBtn" class="add-item-btn">+ Add Item</button>
+        </div>
 
-      <label>Customer:
-        <input type="text" id="saleCustomer" placeholder="Walk-in" />
-      </label>
+        <div class="form-section">
+          <p class="form-section-title">Note</p>
+          <label>
+            <input type="text" id="saleNote" placeholder="Optional note" class="full-width-input" />
+          </label>
+        </div>
 
-      <div id="saleItemsContainer">
-        <h4>Items</h4>
-        <div class="sale-item-row">
-          <input type="number" min="1" class="item-qty" placeholder="Qty" value="1" />
-          <select class="item-name">
-            <option value="">Select item...</option>
-          </select>
-          <input type="number" min="0" step="0.01" class="item-price" placeholder="Price (RM)" />
+        <div class="form-section">
+          <p class="form-section-title">Discount &amp; Status</p>
+          <div class="form-grid">
+            <label>Discount Type
+              <input type="text" id="saleDiscountType" placeholder="None / 10% Off / etc." value="None" />
+            </label>
+            <label>Discount Amount (RM)
+              <input type="number" min="0" step="0.01" id="saleDiscountAmount" value="0" />
+            </label>
+            <label>Status
+              <select id="saleStatus">
+                <option value="Completed">Completed</option>
+                <option value="Preparing">Preparing</option>
+                <option value="Refunded">Refunded</option>
+              </select>
+            </label>
+            <label id="refundReasonWrap" style="display:none;">Refund Reason
+              <input type="text" id="saleRefundReason" placeholder="Reason for refund" />
+            </label>
+          </div>
+        </div>
+
+        <div class="sale-total-preview">
+          <span>Subtotal</span><span id="saleSubtotalPreview">RM0.00</span>
+          <span>Discount</span><span id="saleDiscountPreview">-RM0.00</span>
+          <span class="total-row">Total</span><span id="saleTotalPreview" class="total-row">RM0.00</span>
         </div>
       </div>
-      <button type="button" id="addItemRowBtn" class="admin-btn">+ Add Item</button>
 
-      <label>Note:
-        <input type="text" id="saleNote" placeholder="Optional note" />
-      </label>
-
-      <label>Payment Method:
-        <select id="salePayment">
-          <option value="Cash">Cash</option>
-          <option value="QR">QR</option>
-          <option value="Ewallet">Ewallet</option>
-          <option value="Card">Card</option>
-        </select>
-      </label>
-
-      <label>Discount Type:
-        <input type="text" id="saleDiscountType" placeholder="None / 10% Off / etc." value="None" />
-      </label>
-
-      <label>Discount Amount (RM):
-        <input type="number" min="0" step="0.01" id="saleDiscountAmount" value="0" />
-      </label>
-
-      <label>Status:
-        <select id="saleStatus">
-          <option value="Completed">Completed</option>
-          <option value="Preparing">Preparing</option>
-          <option value="Refunded">Refunded</option>
-        </select>
-      </label>
-
-      <label id="refundReasonWrap" style="display:none;">Refund Reason:
-        <input type="text" id="saleRefundReason" placeholder="Reason for refund" />
-      </label>
-
-      <div class="modal-actions">
-        <button id="saveManualSaleBtn" class="admin-btn export-btn">Save Sale</button>
+      <div class="sale-modal-footer">
         <button id="cancelManualSaleBtn" class="admin-btn">Cancel</button>
+        <button id="saveManualSaleBtn" class="admin-btn export-btn">Save Sale</button>
       </div>
     </div>
   </div>

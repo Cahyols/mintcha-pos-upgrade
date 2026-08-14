@@ -1053,50 +1053,258 @@ body.sidebar-open {
   font-size: 13px;
 }
 
-/* ---- Add Sale modal: needs room for a real form, not a 4-line dialog ---- */
+/* ============================================================
+   ADD SALE MODAL — redesigned (Aug 2026)
+   ============================================================
+   Sectioned form (Order Details / Items / Note / Discount &
+   Status) with a sticky header + footer and a live Subtotal /
+   Discount / Total preview at the bottom. Uses the app's own
+   teal palette (#009688 / #00796b / #004d40) rather than
+   introducing a new accent color, so it matches every other
+   screen. Markup lives in sales-overview.html under
+   #addSaleModal > .sale-modal.
+   ============================================================ */
+
 #addSaleModal .modal-content {
+  padding: 0;
   width: min(92vw, 560px);
   max-width: 560px;
-  max-height: 85vh;
-  overflow-y: auto;
+  max-height: 90vh;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   text-align: left;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.sale-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background-color: #004d40;
+  color: white;
+  flex: 0 0 auto;
+}
+
+.sale-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.sale-modal-header .close {
+  float: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: white;
+  opacity: 0.85;
+}
+
+.sale-modal-header .close:hover {
+  opacity: 1;
+}
+
+.sale-modal-body {
+  padding: 1rem 1.25rem 0.25rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.sale-modal-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid #eee;
+  background: #fff;
+}
+
+/* --- Sections --- */
+#addSaleModal .form-section {
+  margin-bottom: 1.1rem;
+}
+
+#addSaleModal .form-section-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #00796b;
+}
+
+#addSaleModal .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
 }
 
 #addSaleModal label {
-  display: block;
-  margin: 10px 0 4px;
-  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: #333;
 }
 
-#addSaleModal input,
+#addSaleModal .full-width-input {
+  width: 100%;
+}
+
+/* --- Inputs / selects --- */
+#addSaleModal input[type="text"],
+#addSaleModal input[type="number"],
+#addSaleModal input[type="datetime-local"],
 #addSaleModal select {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.55rem 0.6rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+#addSaleModal input:focus,
+#addSaleModal select:focus {
+  outline: none;
+  border-color: #009688;
+  box-shadow: 0 0 0 3px rgba(0, 150, 136, 0.15);
+}
+
+/* --- Item rows --- */
+#addSaleModal .item-rows-head {
+  display: grid;
+  grid-template-columns: 56px 1fr 92px 28px;
+  gap: 8px;
+  padding: 0 2px 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+#saleItemsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 #addSaleModal .sale-item-row {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 56px 1fr 92px 28px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 0; /* spacing now comes from #saleItemsContainer's gap */
 }
 
 #addSaleModal .sale-item-row .item-qty {
-  width: 60px;
+  width: auto;   /* was fixed 60px in the old flex layout; grid handles width now */
   flex: none;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 #addSaleModal .sale-item-row .item-price {
-  width: 100px;
+  width: auto;   /* was fixed 100px in the old flex layout; grid handles width now */
   flex: none;
 }
 
-#addSaleModal .modal-actions {
+.remove-item-row-btn {
+  background: transparent;
+  border: none;
+  color: #d32f2f;
+  font-size: 1.1rem;
+  cursor: pointer;
+  width: 28px;
+  height: 40px;
   display: flex;
-  gap: 10px;
-  margin-top: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 0;
+}
+.remove-item-row-btn:hover {
+  background: #fde8e8;
+}
+
+.add-item-btn {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px dashed #009688;
+  color: #00796b;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  width: 100%;
+}
+.add-item-btn:hover {
+  background: rgba(0, 150, 136, 0.08);
+}
+
+/* --- Live total preview --- */
+.sale-total-preview {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 6px;
+  background: #f7f7f7;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  margin-top: 4px;
+  font-size: 0.88rem;
+}
+
+.sale-total-preview span:nth-child(odd) {
+  color: #888;
+}
+
+.sale-total-preview span:nth-child(even) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sale-total-preview .total-row {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #00796b;
+  border-top: 1px solid #ddd;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+/* Refund reason only shows conditionally; keep it full width in the grid */
+#refundReasonWrap {
+  grid-column: 1 / -1;
+}
+
+.sale-modal-footer .admin-btn {
+  min-height: 42px;
+  padding: 0 1.1rem;
+  border-radius: 6px;
+}
+
+@media (max-width: 480px) {
+  #addSaleModal .modal-content {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+  }
+  #addSaleModal .form-grid {
+    grid-template-columns: 1fr;
+  }
+  #addSaleModal .item-rows-head,
+  #addSaleModal .sale-item-row {
+    grid-template-columns: 48px 1fr 78px 24px;
+  }
 }
 
 /* ============================================================
