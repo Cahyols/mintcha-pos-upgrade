@@ -47,30 +47,64 @@
       letter-spacing: .06em;
       opacity: .85;
       font-weight: 700;
+      color: #fff;
     }
     .ct-next-payout-date {
       font-size: 1.5rem;
       font-weight: 800;
       margin-top: 2px;
+      color: #fff;
     }
     .ct-next-payout-amount {
       font-size: 2.1rem;
       font-weight: 800;
+      color: #fff;
     }
     .ct-next-payout-range {
       font-size: .82rem;
       opacity: .85;
       margin-bottom: 14px;
+      color: #fff;
     }
     .ct-next-payout .ct-week-body { background: rgba(255,255,255,.1); border-radius: 10px; padding: 14px 16px; }
-    .ct-next-payout .ct-line span:last-child { color: #fff; }
-    .ct-next-payout .ct-line.ct-deduct span:last-child { color: #ffd6d6; }
-    .ct-next-payout .ct-drink-list { background: rgba(255,255,255,.12); }
-    .ct-next-payout .ct-drink-row { color: rgba(255,255,255,.85); }
-    .ct-next-payout .ct-channel-breakdown { color: rgba(255,255,255,.8); }
-    .ct-next-payout .ct-manual-input { background: rgba(255,255,255,.9); }
-    .ct-next-payout .ct-net-total { border-top-color: rgba(255,255,255,.3); color: #fff; }
-    .ct-next-payout .ct-extras-title { color: #ffe9c2; }
+
+    /* The hero reuses buildWeekCardHTML(), which always wraps its content in
+       a .ct-week-card div. .ct-week-card has its own opaque white background/
+       border/shadow (see "Week cards" section below) meant for the normal
+       month-view list — inside the hero that white box paints right over the
+       brown gradient. Strip it back to transparent so only .ct-next-payout's
+       own gradient shows. */
+    .ct-next-payout .ct-week-card {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+    }
+
+    /* Text-color overrides for everything inside the hero. These are tagged
+       !important deliberately: buildWeekCardHTML() renders the exact same
+       .ct-line / .ct-drink-row / .ct-manual-input markup used later in the
+       "Week cards" section, and several of those base rules share identical
+       selector specificity with the hero-scoped rules below (e.g.
+       ".ct-line.ct-net-total" vs ".ct-next-payout .ct-net-total"). On a tie,
+       CSS falls back to source order, and the later "Week cards" rules would
+       silently win and turn hero text dark/teal or invisible-white. Forcing
+       !important here makes the hero deterministically override the shared
+       component styles regardless of where they're edited later. */
+    .ct-next-payout .ct-line span                        { color: #fff !important; }
+    .ct-next-payout .ct-line.ct-deduct span:last-child    { color: #ffd6d6 !important; }
+    .ct-next-payout .ct-line.ct-subtotal span:last-child  { color: rgba(255,255,255,.75) !important; }
+    .ct-next-payout .ct-line.ct-net-total,
+    .ct-next-payout .ct-line.ct-net-total span            { color: #fff !important; border-top-color: rgba(255,255,255,.3) !important; }
+    .ct-next-payout .ct-drink-list                        { background: rgba(255,255,255,.12); }
+    .ct-next-payout .ct-drink-row,
+    .ct-next-payout .ct-drink-row span                    { color: rgba(255,255,255,.85) !important; }
+    .ct-next-payout .ct-channel-breakdown,
+    .ct-next-payout .ct-channel-breakdown div             { color: rgba(255,255,255,.8) !important; }
+    .ct-next-payout .ct-manual-input-wrap                 { color: #ffd6d6 !important; }
+    .ct-next-payout .ct-manual-input                      { background: rgba(255,255,255,.9); color: #c62828 !important; }
+    .ct-next-payout .ct-extras-title                      { color: #ffe9c2 !important; }
+    .ct-next-payout .ct-empty-note                        { color: rgba(255,255,255,.7) !important; }
 
     /* === Top control bar: month nav + cup charge setting === */
     .ct-controls-bar {
