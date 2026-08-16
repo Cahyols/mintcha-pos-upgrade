@@ -6,13 +6,6 @@
   <title>Order Management – Mintcha POS</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    /* =========================================================
-       Order Management page refinements.
-       These build on top of style.css's existing palette
-       (teal #00897b/#00796b/#004d40, red #f44336/#d32f2f,
-       admin yellow #fbc02d) rather than introducing new colors.
-       ========================================================= */
-
     #priceControls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .admin-tools-label {
       font-size: .75rem;
@@ -463,8 +456,6 @@
       cursor: not-allowed;
     }
 
-    /* === Cookiedoh combo discount option — tan/brown accent so it reads
-       as a distinct cross-tenant promo, not just another % off. === */
     .discount-option.discount-cookiedoh {
       background-color: #EED7A1;
       color: #6d4c1f;
@@ -472,8 +463,6 @@
     }
     .discount-option.discount-cookiedoh:hover { background-color: #e6c780; }
 
-    /* === Cookiedoh payment method — same tan accent as the discount tag,
-       so cashiers visually associate the two. === */
     .payment-btn.payment-cookiedoh {
       background-color: #EED7A1;
       color: #6d4c1f;
@@ -509,6 +498,14 @@
           <li class="active"><a href="order-management.html">Order Management</a></li>
           <li><a href="stock-overview.html">Stock Overview</a></li>
           <li><a href="menu-recipes.html">Menu Recipes</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">Account</p>
+        <ul>
+          <li><a href="daily-expenses.html">💸 Daily Expenses</a></li>
+          <li><a href="sales-settlement.html">🧾 Sales Settlement</a></li>
         </ul>
       </div>
 
@@ -595,10 +592,7 @@
     </section>
   </div>
 
-  <!-- === Payment Modal ===
-       Two option groups: Dine In (Cash/QR/eWallet/Card/Cookiedoh) and
-       Delivery (Shopee Food/Grab Food). order-management.js shows/hides
-       the correct one based on activeOrderType each time this modal opens. -->
+  <!-- === Payment Modal === -->
   <div id="paymentModal" class="modal hidden">
     <div class="modal-content">
       <span id="closePaymentModal" class="close">&times;</span>

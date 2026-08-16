@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sales Settlement – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .page-content { padding: 0 1.5rem 1.5rem; }
+    .dashboard-header { padding: 1.5rem 1.5rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .dashboard-header h1 { margin: 0; }
+    .dashboard-header input[type=date] { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-weight: 700; }
+
+    .dashboard-card {
+      background: #fff; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .dashboard-card h3 { margin: 0 0 4px; font-size: 1.05rem; }
+    .dashboard-card .hint { font-size: 12px; color: #888; margin-bottom: 14px; }
+
+    .status-banner { padding: 12px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 700; margin-bottom: 1.25rem; }
+    .status-banner.open { background: #fff3e0; color: #e65100; }
+    .status-banner.closed { background: #e8f5e9; color: #2e7d32; }
+
+    table.tender { width: 100%; border-collapse: collapse; }
+    table.tender th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: #888; padding: 6px 8px; font-weight: 700; }
+    table.tender td { padding: 8px; border-top: 1px solid #eee; font-size: 13.5px; }
+    table.tender tr:first-child td { border-top: none; }
+    table.tender td.label { font-weight: 700; }
+    table.tender td.amt { text-align: right; }
+    table.tender input { width: 100%; padding: 9px 10px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; text-align: right; box-sizing: border-box; }
+    table.tender input:focus { outline: none; border-color: #00897b; }
+    table.tender input:disabled { background: #f3f4f6; color: #888; }
+    td.diff { text-align: right; font-weight: 800; font-size: 13.5px; white-space: nowrap; }
+    .diff-zero { color: #888; }
+    .diff-pos { color: #2e7d32; }
+    .diff-neg { color: #c62828; }
+    tr.total-row td { border-top: 2px solid #333; font-weight: 800; padding-top: 10px; }
+
+    .method-breakdown { margin-top: 12px; padding: 10px 14px; background: #f7f7f7; border-radius: 10px; font-size: 12px; color: #555; }
+    .method-breakdown div { display: flex; justify-content: space-between; padding: 2px 0; }
+
+    .expense-note { display: flex; justify-content: space-between; align-items: center; background: #e0f2f1; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #00796b; font-weight: 700; margin-top: 12px; }
+
+    label.field-label { display: block; font-size: 12.5px; font-weight: 700; color: #777; margin: 12px 0 6px; }
+    input[type=text].wide { width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+    input[type=text].wide:disabled { background: #f3f4f6; }
+
+    .btn-block { width: 100%; margin-top: 14px; padding: 13px; font-size: 14.5px; font-weight: 700; }
+    .btn-ghost-block { width: 100%; margin-top: 14px; padding: 13px; font-size: 14.5px; font-weight: 700; background: #fff; color: #555; border: 1.5px solid #ddd; }
+
+    .history-item { border: 1px solid #eee; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fff; }
+    .history-item:hover { border-color: #00897b; }
+    .history-item .d { font-weight: 800; font-size: 13.5px; }
+    .history-item .s { font-size: 12px; color: #888; margin-top: 2px; }
+    .history-badge { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 20px; }
+    .history-badge.balanced { background: #e8f5e9; color: #2e7d32; }
+    .history-badge.off { background: #fdecec; color: #c62828; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- === SIDEBAR === -->
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+          <li id="adminStockUsageLink" style="display:none;"><a href="stock-usage.html">Stock Usage</a></li>
+          <li><a href="coffee-traps.html">🧉 Coffee Traps</a></li>
+        </ul>
+      </div>
+
+      <!-- === Account (new) === -->
+      <div class="nav-section">
+        <p class="section-title">Account</p>
+        <ul>
+          <li><a href="daily-expenses.html">💸 Daily Expenses</a></li>
+          <li class="active"><a href="sales-settlement.html">🧾 Sales Settlement</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">Logged In As</p>
+        <p id="currentCashier" class="bold"></p>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- === MAIN CONTENT === -->
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>🧾 Sales Settlement</h1>
+        <input type="date" id="settleDate">
+      </header>
+
+      <div class="page-content">
+        <div class="status-banner open" id="statusBanner">Day is open — not yet closed</div>
+
+        <div class="dashboard-card">
+          <h3>System sales (auto-pulled from Sales Overview)</h3>
+          <div class="hint">Pulled live from today's completed sales, split by payment method. Refunded sales are excluded.</div>
+          <table class="tender">
+            <tr><th>Tender</th><th style="text-align:right;">System sales</th></tr>
+            <tr><td class="label">Cash</td><td class="amt" id="sysCash">RM 0.00</td></tr>
+            <tr><td class="label">Card</td><td class="amt" id="sysCard">RM 0.00</td></tr>
+            <tr><td class="label">QR / eWallet</td><td class="amt" id="sysQr">RM 0.00</td></tr>
+            <tr><td class="label">Others (Cookiedoh / Shopee / Grab)</td><td class="amt" id="sysOthers">RM 0.00</td></tr>
+            <tr class="total-row"><td>Total system sales</td><td class="amt" id="sysTotal">RM 0.00</td></tr>
+          </table>
+          <div class="method-breakdown" id="methodBreakdown"></div>
+          <div class="expense-note">
+            <span>Approved cash expenses today (paid out of drawer)</span>
+            <span id="cashExpenseTotal">RM 0.00</span>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Actual count</h3>
+          <div class="hint">Expected cash = system cash sales − cash paid out. Enter what was actually counted / settled for each tender.</div>
+          <table class="tender">
+            <tr><th>Tender</th><th style="text-align:right;">Expected</th><th style="text-align:right;">Actual</th><th style="text-align:right;">Diff</th></tr>
+            <tr>
+              <td class="label">Cash</td>
+              <td class="amt" id="expCash">RM 0.00</td>
+              <td><input type="number" id="actCash" step="0.01" placeholder="0.00"></td>
+              <td class="diff" id="diffCash">RM 0.00</td>
+            </tr>
+            <tr>
+              <td class="label">Card</td>
+              <td class="amt" id="expCard">RM 0.00</td>
+              <td><input type="number" id="actCard" step="0.01" placeholder="0.00"></td>
+              <td class="diff" id="diffCard">RM 0.00</td>
+            </tr>
+            <tr>
+              <td class="label">QR / eWallet</td>
+              <td class="amt" id="expQr">RM 0.00</td>
+              <td><input type="number" id="actQr" step="0.01" placeholder="0.00"></td>
+              <td class="diff" id="diffQr">RM 0.00</td>
+            </tr>
+            <tr>
+              <td class="label">Others</td>
+              <td class="amt" id="expOthers">RM 0.00</td>
+              <td><input type="number" id="actOthers" step="0.01" placeholder="0.00"></td>
+              <td class="diff" id="diffOthers">RM 0.00</td>
+            </tr>
+            <tr class="total-row">
+              <td>Total</td>
+              <td class="amt" id="expTotal">RM 0.00</td>
+              <td class="amt" id="actTotal">RM 0.00</td>
+              <td class="diff" id="diffTotal">RM 0.00</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Close day</h3>
+          <label class="field-label">Notes (optional — explain any variance)</label>
+          <input type="text" class="wide" id="notes" placeholder="e.g. RM5 short in cash, till miscounted">
+          <button class="btn-block" id="closeBtn">Close & save today's settlement</button>
+          <button class="btn-ghost-block" id="reopenBtn" style="display:none;">Reopen this day for editing</button>
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Recent settlements</h3>
+          <div id="historyContainer"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/sales-settlement.js"></script>
+</body>
+</html>

@@ -22,6 +22,14 @@
       </div>
 
       <div class="nav-section">
+        <p class="section-title">Account</p>
+        <ul>
+          <li><a href="daily-expenses.html">💸 Daily Expenses</a></li>
+          <li><a href="sales-settlement.html">🧾 Sales Settlement</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
         <p class="section-title">Logged In As</p>
         <p id="currentCashier"></p>
       </div>
@@ -115,11 +123,7 @@
     </section>
   </div>
 
-  <!-- === Receipt Modal (view-only, reused pattern from Order Management) ===
-       No static close button here — viewReceipt() in sales-overview.js
-       builds its own close button (#closeReceiptModal) inside
-       #receiptContent every time it renders. A leftover static one here
-       previously created a duplicate-id element that never got wired up. -->
+  <!-- === Receipt Modal (view-only, reused pattern from Order Management) === -->
   <div id="receiptModal" class="modal hidden">
     <div id="receiptContent"></div>
   </div>
@@ -152,11 +156,7 @@
     </div>
   </div>
 
-  <!-- === Add Sale (Manual Entry) Modal — redesigned layout ===
-       Same field ids as before so sales-overview.js works unchanged;
-       just regrouped into sections + a live total preview. Styling
-       lives in css/addsale-modal.css, scoped under .sale-modal so it
-       won't affect any other page. -->
+  <!-- === Add Sale (Manual Entry) Modal === -->
   <div id="addSaleModal" class="modal hidden">
     <div class="modal-content sale-modal">
       <div class="sale-modal-header">

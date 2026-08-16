@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Daily Expenses – Mintcha POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .page-content { padding: 0 1.5rem 1.5rem; }
+    .dashboard-header { padding: 1.5rem 1.5rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .dashboard-header h1 { margin: 0; }
+
+    .dashboard-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .dashboard-card h3 { margin: 0 0 1rem; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
+
+    /* === Summary strip === */
+    .exp-summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.25rem; }
+    @media (max-width: 700px) { .exp-summary-grid { grid-template-columns: repeat(2,1fr); } }
+    .exp-stat { background: #fff; border-radius: 12px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .exp-stat .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+    .exp-stat .value { font-size: 1.3rem; font-weight: 800; margin-top: 4px; }
+    .exp-stat.debit .value { color: #c62828; }
+    .exp-stat.credit .value { color: #2e7d32; }
+    .exp-stat.pending .value { color: #e65100; }
+
+    /* === Tabs === */
+    .exp-tabs { display: flex; gap: 6px; background: #fff; border-radius: 12px; padding: 5px; margin-bottom: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .exp-tab-btn { flex: 1; border: none; background: transparent; padding: 10px 8px; border-radius: 9px; font-size: 13.5px; font-weight: 700; color: #777; cursor: pointer; position: relative; }
+    .exp-tab-btn.active { background: #00897b; color: #fff; }
+    .exp-tab-btn .badge-count { position: absolute; top: 2px; right: 6px; background: #fbc02d; color: #333; border-radius: 20px; font-size: 10px; padding: 1px 6px; font-weight: 800; }
+    .exp-tab-btn.active .badge-count { background: rgba(255,255,255,.35); color: #fff; }
+
+    .exp-panel { display: none; }
+    .exp-panel.active { display: block; }
+
+    /* === Form === */
+    #entryForm label { display: block; font-size: 12.5px; font-weight: 700; color: #777; margin: 12px 0 6px; }
+    #entryForm label:first-child { margin-top: 0; }
+    #entryForm input[type=text], #entryForm input[type=number], #entryForm select, #entryForm textarea {
+      width: 100%; padding: 11px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; font-family: inherit; box-sizing: border-box;
+    }
+    #entryForm textarea { resize: vertical; min-height: 56px; }
+    #entryForm input:focus, #entryForm select:focus { outline: none; border-color: #00897b; }
+
+    .pillrow { display: flex; gap: 8px; }
+    .pill { flex: 1; padding: 11px 8px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; text-align: center; font-size: 13.5px; font-weight: 700; color: #777; cursor: pointer; user-select: none; }
+    .pill input { display: none; }
+    .pill.sel-debit.checked { background: #fdecec; border-color: #c62828; color: #c62828; }
+    .pill.sel-credit.checked { background: #e8f5e9; border-color: #2e7d32; color: #2e7d32; }
+    .pill.sel-method.checked { background: #e0f2f1; border-color: #00897b; color: #00796b; }
+
+    .btn-block { width: 100%; margin-top: 16px; padding: 13px; font-size: 14.5px; font-weight: 700; }
+
+    /* === Entry list === */
+    .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .filter-row select, .filter-row input { padding: 8px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; }
+
+    .exp-entry { border: 1px solid #eee; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+    .exp-entry-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .exp-entry-desc { font-size: 14.5px; font-weight: 700; }
+    .exp-entry-meta { font-size: 12px; color: #888; margin-top: 3px; }
+    .exp-entry-amt { font-size: 16px; font-weight: 800; white-space: nowrap; }
+    .exp-entry-amt.debit { color: #c62828; }
+    .exp-entry-amt.credit { color: #2e7d32; }
+
+    .exp-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .exp-tag { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 20px; text-transform: uppercase; letter-spacing: .02em; }
+    .exp-tag.status-pending { background: #fff3e0; color: #e65100; }
+    .exp-tag.status-approved { background: #e8f5e9; color: #2e7d32; }
+    .exp-tag.status-rejected { background: #fdecec; color: #c62828; }
+    .exp-tag.method { background: #eef2ff; color: #4338ca; }
+    .exp-tag.category { background: #f3f4f6; color: #444; }
+
+    .exp-approve-row { display: flex; gap: 8px; margin-top: 12px; }
+    .exp-approve-row button { flex: 1; padding: 9px; font-size: 13px; }
+    .exp-reject-box { margin-top: 10px; display: none; }
+    .exp-reject-box.show { display: block; }
+    .exp-reject-box input { width: 100%; padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; box-sizing: border-box; }
+
+    .exp-empty { text-align: center; padding: 36px 20px; color: #888; font-size: 13.5px; }
+    .exp-empty .big { font-size: 32px; display: block; margin-bottom: 8px; }
+
+    .btn-danger-sm { background: #c62828; color: #fff; }
+    .btn-danger-sm:hover { background: #b71c1c; }
+    .btn-approve { background: #2e7d32; color: #fff; }
+    .btn-approve:hover { background: #1b5e20; }
+    .btn-reject { background: #c62828; color: #fff; }
+    .btn-reject:hover { background: #b71c1c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- === SIDEBAR === -->
+    <aside class="sidebar">
+      <h2 class="brand">🍃 Mintcha</h2>
+
+      <div class="nav-section">
+        <p class="section-title">Main Menu</p>
+        <ul>
+          <li><a href="dashboard.html">Dashboard</a></li>
+          <li><a href="sales-overview.html">Sales Overview</a></li>
+          <li><a href="order-management.html">Order Management</a></li>
+          <li><a href="stock-overview.html">Stock Overview</a></li>
+          <li><a href="menu-recipes.html">Menu Recipes</a></li>
+          <li id="adminStockUsageLink" style="display:none;"><a href="stock-usage.html">Stock Usage</a></li>
+          <li><a href="coffee-traps.html">🧉 Coffee Traps</a></li>
+        </ul>
+      </div>
+
+      <!-- === Account (new) === -->
+      <div class="nav-section">
+        <p class="section-title">Account</p>
+        <ul>
+          <li class="active"><a href="daily-expenses.html">💸 Daily Expenses</a></li>
+          <li><a href="sales-settlement.html">🧾 Sales Settlement</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">Logged In As</p>
+        <p id="currentCashier" class="bold"></p>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">General</p>
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- === MAIN CONTENT === -->
+    <section class="dashboard page">
+      <header class="dashboard-header">
+        <h1>💸 Daily Expenses</h1>
+        <span id="todayBadge" class="user-badge"></span>
+      </header>
+
+      <div class="page-content">
+        <div class="exp-summary-grid">
+          <div class="exp-stat debit"><div class="label">Debit (approved)</div><div class="value" id="sumDebit">RM 0.00</div></div>
+          <div class="exp-stat credit"><div class="label">Credit (approved)</div><div class="value" id="sumCredit">RM 0.00</div></div>
+          <div class="exp-stat pending"><div class="label">Pending</div><div class="value" id="sumPendingCount">0</div></div>
+          <div class="exp-stat"><div class="label">Cash out (approved)</div><div class="value" id="sumCashOut">RM 0.00</div></div>
+        </div>
+
+        <div class="exp-tabs">
+          <button class="exp-tab-btn active" data-tab="entry">New Entry</button>
+          <button class="exp-tab-btn" data-tab="list">Today</button>
+          <button class="exp-tab-btn" id="approvalsTabBtn" data-tab="approve" style="display:none;">Approvals<span class="badge-count" id="pendingBadge" style="display:none;">0</span></button>
+        </div>
+
+        <!-- NEW ENTRY -->
+        <section class="exp-panel active" id="panel-entry">
+          <div class="dashboard-card">
+            <h3>Add expense entry</h3>
+            <form id="entryForm">
+              <label>Type</label>
+              <div class="pillrow">
+                <label class="pill sel-debit checked" data-type="debit"><input type="radio" name="type" value="debit" checked>Debit (money out)</label>
+                <label class="pill sel-credit" data-type="credit"><input type="radio" name="type" value="credit">Credit (money in)</label>
+              </div>
+
+              <label>Category</label>
+              <select id="category" required>
+                <option value="">Select category</option>
+                <option>Stock / Ingredients</option>
+                <option>Utilities</option>
+                <option>Maintenance & Repairs</option>
+                <option>Cleaning & Supplies</option>
+                <option>Staff Meal</option>
+                <option>Petty Cash</option>
+                <option>Transport / Delivery</option>
+                <option>Refund</option>
+                <option>Other</option>
+              </select>
+
+              <label>Description</label>
+              <textarea id="description" placeholder="e.g. Milk & syrup restock from supplier" required></textarea>
+
+              <label>Amount (RM)</label>
+              <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" required>
+
+              <label>Payment method</label>
+              <div class="pillrow">
+                <label class="pill sel-method checked" data-method="cash"><input type="radio" name="method" value="cash" checked>Cash</label>
+                <label class="pill sel-method" data-method="qr"><input type="radio" name="method" value="qr">QR</label>
+                <label class="pill sel-method" data-method="claim"><input type="radio" name="method" value="claim">Claim</label>
+              </div>
+
+              <button type="submit" class="btn-block">Submit for approval</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- TODAY LIST -->
+        <section class="exp-panel" id="panel-list">
+          <div class="filter-row">
+            <select id="filterStatus">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <input type="date" id="filterDate">
+          </div>
+          <div id="listContainer"></div>
+        </section>
+
+        <!-- APPROVALS (admin only) -->
+        <section class="exp-panel" id="panel-approve">
+          <div id="approveContainer"></div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/common.js"></script>
+  <script src="js/daily-expenses.js"></script>
+</body>
+</html>

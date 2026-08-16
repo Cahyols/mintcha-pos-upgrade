@@ -333,10 +333,6 @@
   font-weight: 700;
   color: #333;
 }
-/* === Add-on rows inside the drink breakdown (e.g. "+matcha", "+milk") ===
-   These stay visible so you can see what add-ons sold, but are visually
-   dimmed and tagged so it's clear they aren't a drink on their own and
-   are NOT part of the cup/transaction counts above. */
 .cat-drink-row.cat-drink-addon {
   color: #999;
   font-style: italic;
@@ -389,10 +385,6 @@
     .cat-badge.cat-dessert { background: rgba(255,255,255,.6); color: #a3184f; }
     .cat-badge.cat-uncat   { background: rgba(255,255,255,.6); color: #666; }
 
-    /* === Cookiedoh category box — same tan accent used for the Cookiedoh
-       discount/payment method in Order Management, so the two visually
-       match up across the app. This box only shows up when there's at
-       least 1 Cookiedoh cup in the selected range. */
     .category-box.cat-cookiedoh { background: #f7ecd3; border: 1px solid #e6c780; }
     .cat-badge.cat-cookiedoh { background: rgba(255,255,255,.7); color: #6d4c1f; }
 
@@ -400,7 +392,6 @@
       .summary-hero .value { font-size: 1.6rem; }
     }
 
-    /* === Hourly Report toggle button === */
     .hourly-toggle-btn {
       background: #fff;
       border: 1px solid #00897b;
@@ -414,7 +405,6 @@
     .hourly-toggle-btn:hover { background: #e0f2f1; }
     .hourly-toggle-btn.active:hover { background: #00796b; }
 
-    /* === Hourly Report panel === */
     .hourly-peak-banner {
       background: #fff8e1;
       border: 1px solid #ffe082;
@@ -493,9 +483,8 @@
       }
     }
 
-    /* === Backup reminder banner === */
     .backup-banner {
-      display: none; /* toggled to flex by backup.js when overdue */
+      display: none;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
@@ -534,7 +523,6 @@
     }
     .backup-banner .secondary-action:hover { background: #ffe9cc; }
 
-    /* === Backup & Restore card === */
     .backup-card-body {
       display: flex;
       flex-wrap: wrap;
@@ -571,7 +559,6 @@
     }
     #restoreBackupTriggerBtn:hover { background: #fdecec; }
 
-    /* === Data Maintenance (renamed-item fix) === */
     #dataMaintenanceCard .maintenance-body {
       display: flex;
       flex-wrap: wrap;
@@ -621,11 +608,22 @@
     <!-- Admin-only -->
     <li id="adminStockUsageLink" style="display:none;"><a href="stock-usage.html">Stock Usage</a></li>
     <li><a href="coffee-traps.html">🧉 Coffee Traps</a></li>
-    <li><a href="#" onclick="logout()">Logout</a></li>
   </ul>
 </div>
 
-      <div class="nav-section"></div>
+      <div class="nav-section">
+        <p class="section-title">Account</p>
+        <ul>
+          <li><a href="daily-expenses.html">💸 Daily Expenses</a></li>
+          <li><a href="sales-settlement.html">🧾 Sales Settlement</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <ul>
+          <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
     </aside>
 
     <!-- === MAIN CONTENT === -->
@@ -696,16 +694,6 @@
         </section>
 
         <!-- === Data Maintenance: Fix Renamed Menu Items (Admin only) === -->
-        <!-- One-time-use tool. If a drink on Menu Recipes gets renamed (e.g.
-             "Mintcha Bloom" -> "Mintcha Bloom (MB)"), older sales still have
-             the OLD name stored on each line item. Since the Dashboard's
-             category breakdown looks items up by exact name match against
-             the current menu, those older sales fall into "Uncategorized"
-             instead of their real category. This button re-scans all past
-             sales, derives old->new name pairs by stripping the trailing
-             " (CODE)" off each current menu item's name, downloads a backup
-             of mintcha_sales first, then rewrites any matching old names to
-             the current name so they slot back under the right category. -->
         <section id="dataMaintenanceCard" class="dashboard-card" style="display:none;">
           <h3>🔧 Data Maintenance</h3>
           <div class="maintenance-body">

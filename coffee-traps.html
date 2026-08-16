@@ -68,12 +68,6 @@
     }
     .ct-next-payout .ct-week-body { background: rgba(255,255,255,.1); border-radius: 10px; padding: 14px 16px; }
 
-    /* The hero reuses buildWeekCardHTML(), which always wraps its content in
-       a .ct-week-card div. .ct-week-card has its own opaque white background/
-       border/shadow (see "Week cards" section below) meant for the normal
-       month-view list — inside the hero that white box paints right over the
-       brown gradient. Strip it back to transparent so only .ct-next-payout's
-       own gradient shows. */
     .ct-next-payout .ct-week-card {
       background: transparent;
       border: none;
@@ -81,16 +75,6 @@
       padding: 0;
     }
 
-    /* Text-color overrides for everything inside the hero. These are tagged
-       !important deliberately: buildWeekCardHTML() renders the exact same
-       .ct-line / .ct-drink-row / .ct-manual-input markup used later in the
-       "Week cards" section, and several of those base rules share identical
-       selector specificity with the hero-scoped rules below (e.g.
-       ".ct-line.ct-net-total" vs ".ct-next-payout .ct-net-total"). On a tie,
-       CSS falls back to source order, and the later "Week cards" rules would
-       silently win and turn hero text dark/teal or invisible-white. Forcing
-       !important here makes the hero deterministically override the shared
-       component styles regardless of where they're edited later. */
     .ct-next-payout .ct-line span                        { color: #fff !important; }
     .ct-next-payout .ct-line.ct-deduct span:last-child    { color: #ffd6d6 !important; }
     .ct-next-payout .ct-line.ct-subtotal span:last-child  { color: rgba(255,255,255,.75) !important; }
@@ -360,6 +344,19 @@
           <li><a href="menu-recipes.html">Menu Recipes</a></li>
           <li id="adminStockUsageLink" style="display:none;"><a href="stock-usage.html">Stock Usage</a></li>
           <li class="active"><a href="coffee-traps.html">🧉 Coffee Traps</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <p class="section-title">Account</p>
+        <ul>
+          <li><a href="daily-expenses.html">💸 Daily Expenses</a></li>
+          <li><a href="sales-settlement.html">🧾 Sales Settlement</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <ul>
           <li><a href="#" onclick="logout()">Logout</a></li>
         </ul>
       </div>
