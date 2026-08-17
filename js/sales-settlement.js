@@ -105,14 +105,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === Payment-method bucketing ===
   // Covers both live checkout methods (order-management.js: "Cash",
-  // "QR Code", "TNG eWallet", "Card", "Cookiedoh", "Shopee Food", "Grab
-  // Food") and the Add Sale manual-entry method names (sales-overview.js:
-  // "Cash", "QR", "Ewallet", "Card") — the two use slightly different
-  // labels for the same tender, so this matches by keyword rather than
-  // exact string.
+  // "QR Code", "TNG eWallet", "Card", "Cookiedoh", "Mala Bistro", "Shopee
+  // Food", "Grab Food") and the Add Sale manual-entry method names
+  // (sales-overview.js: "Cash", "QR", "Ewallet", "Card") — the two use
+  // slightly different labels for the same tender, so this matches by
+  // keyword rather than exact string.
+  //
+  // Mala Bistro is matched here purely for cash-drawer reconciliation
+  // purposes (same as Cookiedoh/Shopee/Grab) — it never carries a
+  // discount, so there's nothing else to special-case for it on this page.
   function bucketForMethod(method) {
     const m = String(method || "").toLowerCase();
-    if (m.includes("cookiedoh") || m.includes("shopee") || m.includes("grab")) return "others";
+    if (m.includes("cookiedoh") || m.includes("mala") || m.includes("shopee") || m.includes("grab")) return "others";
     if (m.includes("cash")) return "cash";
     if (m.includes("card")) return "card";
     if (m.includes("qr") || m.includes("ewallet") || m.includes("e-wallet")) return "qr";

@@ -1,4 +1,4 @@
-console.log("[dashboard.js] v7 loaded — Shopee/Grab delivery split + Cookiedoh sales split out + servings-based low stock alerts + renamed-item fix tool + auth guard active");
+console.log("[dashboard.js] v8 loaded — Mala Bistro (no-discount, settles Mon) added alongside Cookiedoh + Shopee/Grab delivery split + servings-based low stock alerts + renamed-item fix tool + auth guard active");
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireAuth()) return;
@@ -409,6 +409,13 @@ document.addEventListener("DOMContentLoaded", () => {
     dessert: "Dessert",
     uncategorized: "Uncategorized",
     cookiedoh: "🍪 Cookiedoh",
+    // Mala Bistro: second cross-tenant partner, same settlement pattern
+    // as Cookiedoh (see isMalaBistroSale below) but this bucket's
+    // `discount` total is structurally always 0 — Mala Bistro never
+    // appears anywhere a discount can be applied (see
+    // order-management.js), so the "-RMx discount" line under its
+    // category box is never rendered.
+    mala: "🌶️ Mala Bistro",
     shopee: "🛍️ Shopee Food",
     grab: "🚗 Grab Food"
   };
@@ -420,6 +427,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // and this number can be tallied 1:1 against what Cookiedoh reports.
   function isCookiedohSale(sale) {
     return sale.paymentMethod === "Cookiedoh";
+  }
+
+  // A sale is a Mala Bistro sale if Mala Bistro collected the payment for
+  // it — see order-management.js's "Mala Bistro (settles Mon)" payment
+  // method. Same cross-tenant settlement pattern as Cookiedoh: tallied
+  // separately here so it can be reconciled 1:1 against what Mala Bistro
+  // reports collecting.
+  function isMalaBistroSale(sale) {
+    return sale.paymentMethod === "Mala Bistro";
   }
 
   // Delivery sales are paid via one of the two platform-specific payment
@@ -441,6 +457,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // methods, so at most one of these will ever be true for a given sale.
   function getSaleBucket(sale, meta) {
     if (isCookiedohSale(sale)) return "cookiedoh";
+    if (isMalaBistroSale(sale)) return "mala";
     if (isShopeeSale(sale)) return "shopee";
     if (isGrabSale(sale)) return "grab";
     return meta.category;
@@ -630,9 +647,15 @@ document.addEventListener("DOMContentLoaded", () => {
       // it can be tallied against what Cookiedoh reports collecting, and so
       // those drinks don't get double-listed under Matcha/Coffee/Dessert too.
       cookiedoh: { cups: 0, revenue: 0, discount: 0, drinks: {} },
+      // Sales collected by Mala Bistro (see isMalaBistroSale) — same
+      // separate-bucket treatment as Cookiedoh. `discount` is kept here for
+      // structural symmetry with the other buckets, but it can never be
+      // incremented in practice (see the second pass below), since Mala
+      // Bistro sales never carry a discountAmount.
+      mala: { cups: 0, revenue: 0, discount: 0, drinks: {} },
       // Delivery sales, split by platform so each can be reconciled against
       // that platform's own settlement report. Never overlaps with the
-      // dine-in categories above or with Cookiedoh.
+      // dine-in categories above or with Cookiedoh/Mala Bistro.
       shopee: { cups: 0, revenue: 0, discount: 0, drinks: {} },
       grab: { cups: 0, revenue: 0, discount: 0, drinks: {} }
     };
@@ -676,9 +699,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const saleCategorySubtotal = {};
       (sale.items || []).forEach(item => {
         const meta = menuCategoryMap[item.name] || { category: "uncategorized" };
-        // Cookiedoh / Shopee Food / Grab Food sales are tallied on their
-        // own — never split back into Matcha/Coffee/Dessert/Uncategorized,
-        // so nothing gets counted twice.
+        // Cookiedoh / Mala Bistro / Shopee Food / Grab Food sales are
+        // tallied on their own — never split back into
+        // Matcha/Coffee/Dessert/Uncategorized, so nothing gets counted twice.
         const rawCat = getSaleBucket(sale, meta);
         const cat = categoryTotals[rawCat] ? rawCat : "uncategorized";
         const qty = item.qty || 0;
@@ -700,6 +723,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // === Second pass: spread this sale's discount across categories,
       // proportional to how much of the sale's subtotal each category made up ===
+      // Mala Bistro sales never reach this branch with a non-zero
+      // saleDiscount (there is no way to apply a discount to that payment
+      // method — see order-management.js), so categoryTotals.mala.discount
+      // stays 0 and its "-RMx discount" line is never rendered below.
       const saleSubtotal = parseFloat(sale.subtotal || 0);
       const saleDiscount = parseFloat(sale.discountAmount || 0);
       const saleCategorySubtotalSum = Object.values(saleCategorySubtotal).reduce((a, b) => a + b, 0);
@@ -793,6 +820,14 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="category-sub">RM${categoryTotals.cookiedoh.revenue.toFixed(2)}</span>
             ${categoryTotals.cookiedoh.discount > 0 ? `<span class="category-discount">-RM${categoryTotals.cookiedoh.discount.toFixed(2)} discount</span>` : ""}
             ${renderCategoryDrinksList(categoryTotals.cookiedoh.drinks)}
+          </div>
+        ` : ""}
+        ${categoryTotals.mala.cups > 0 ? `
+          <div class="category-box cat-mala">
+            <span class="cat-badge cat-mala">🌶️ Mala Bistro</span>
+            <span class="category-cups">${categoryTotals.mala.cups}</span>
+            <span class="category-sub">RM${categoryTotals.mala.revenue.toFixed(2)}</span>
+            ${renderCategoryDrinksList(categoryTotals.mala.drinks)}
           </div>
         ` : ""}
         ${categoryTotals.shopee.cups > 0 ? `

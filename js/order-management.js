@@ -576,6 +576,10 @@ function decreaseQty(index) {
 }
 
 // === Discount Calculation (single source of truth) ===
+// NOTE: Mala Bistro deliberately has NO case here. It is a payment
+// method only — there is no "Mala Bistro" entry in the discount modal
+// (order-management.html), so appliedDiscount can never become that
+// value, and this switch has nothing to match even if it somehow did.
 function calculateDiscount(cartItems, discountLabel) {
   const subtotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
   const totalQty = cartItems.reduce((sum, i) => sum + i.qty, 0);
@@ -855,6 +859,16 @@ function finalizeSale(method, cashInfo = null) {
           <div><strong>Settlement:</strong> Collected by Cookiedoh — paid to Mintcha every Monday</div>
     ` : "";
 
+    // Mala Bistro: same cross-tenant settlement pattern as Cookiedoh —
+    // they collect the payment on our behalf and settle with us every
+    // Monday. Unlike Cookiedoh, this payment method has no discount
+    // attached anywhere (no entry in the discount modal, no case in
+    // calculateDiscount()), so this block only ever handles the
+    // settlement note, never a discount.
+    const malaReceiptBlock = method === "Mala Bistro" ? `
+          <div><strong>Settlement:</strong> Collected by Mala Bistro — paid to Mintcha every Monday</div>
+    ` : "";
+
     receiptContent.innerHTML = `
       <div class="receipt-brand">🍃 Mintcha</div>
       <div class="receipt-header">
@@ -875,6 +889,7 @@ function finalizeSale(method, cashInfo = null) {
         <strong>Total:</strong> RM${total.toFixed(2)}<br>
         ${cashReceiptBlock}
         ${cookiedohReceiptBlock}
+        ${malaReceiptBlock}
         <div class="receipt-barcode"></div>
         <div>#TeamRumput VS #TeamMint 💚</div>
         <button id="closeReceiptModal">OK</button>
@@ -899,7 +914,12 @@ function finalizeSale(method, cashInfo = null) {
       // Only present for Cookiedoh sales — Cookiedoh holds the cash and
       // settles with Mintcha weekly, so these need to be tracked as
       // outstanding until they pay up on Monday.
-      ...(method === "Cookiedoh" ? { settlementStatus: "Owed by Cookiedoh", settlementDay: "Monday" } : {})
+      ...(method === "Cookiedoh" ? { settlementStatus: "Owed by Cookiedoh", settlementDay: "Monday" } : {}),
+      // Same idea for Mala Bistro — a second, independent cross-tenant
+      // partner that also settles Monday. Kept as its own condition
+      // (rather than merged into the Cookiedoh one) so each partner's
+      // settlementStatus text stays correctly attributed.
+      ...(method === "Mala Bistro" ? { settlementStatus: "Owed by Mala Bistro", settlementDay: "Monday" } : {})
     };
 
     const allSales = JSON.parse(localStorage.getItem("mintcha_sales") || "[]");
@@ -1039,7 +1059,7 @@ document.addEventListener("DOMContentLoaded", () => {
   proceedPayment.addEventListener("click", () => {
     if (cart.length === 0) return alert("Cart is empty!");
 
-    // Dine In: Cash/QR/eWallet/Card/Cookiedoh. Delivery: Shopee Food/Grab Food only.
+    // Dine In: Cash/QR/eWallet/Card/Cookiedoh/Mala Bistro. Delivery: Shopee Food/Grab Food only.
     const isDelivery = activeOrderType === "delivery";
     dineInPaymentOptions?.classList.toggle("hidden", isDelivery);
     deliveryPaymentOptions?.classList.toggle("hidden", !isDelivery);

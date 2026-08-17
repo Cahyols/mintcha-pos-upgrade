@@ -470,6 +470,17 @@
     }
     .payment-btn.payment-cookiedoh:hover { background-color: #e6c780; }
 
+    /* === Mala Bistro: cross-tenant payment method, settles Mon === */
+    /* Same settlement pattern as Cookiedoh, but this method never has a
+       discount attached, so there is deliberately NO
+       .discount-option.discount-mala counterpart below. */
+    .payment-btn.payment-mala {
+      background-color: #ffccbc;
+      color: #a13800;
+      border: 1.5px solid #ff8a65;
+    }
+    .payment-btn.payment-mala:hover { background-color: #ffab91; }
+
     @media (prefers-reduced-motion: reduce) {
       .menu-item, .toast { transition: none !important; animation: none !important; }
     }
@@ -604,6 +615,11 @@
         <button class="payment-btn" data-method="TNG eWallet">🧧 TNG eWallet</button>
         <button class="payment-btn" data-method="Card">💳 Card</button>
         <button class="payment-btn payment-cookiedoh" data-method="Cookiedoh">🍪 Cookiedoh (settles Mon)</button>
+        <!-- Mala Bistro: same cross-tenant settlement pattern as Cookiedoh
+             (collects payment for us, settles Monday), but intentionally
+             has NO matching entry in the discount modal below — this
+             payment method can never carry a discount. -->
+        <button class="payment-btn payment-mala" data-method="Mala Bistro">🌶️ Mala Bistro (settles Mon)</button>
       </div>
 
       <div class="payment-options hidden" id="deliveryPaymentOptions">
@@ -662,6 +678,9 @@
   </div>
 
   <!-- ✅ Discount Modal -->
+  <!-- NOTE: intentionally no Mala Bistro entry here — per spec, Mala
+       Bistro has no discount option, so it's never selectable from this
+       modal and calculateDiscount() has no "case" for it either. -->
   <div id="discountModal" class="modal hidden">
     <div class="modal-content">
       <span id="closeDiscountModal" class="close">&times;</span>
