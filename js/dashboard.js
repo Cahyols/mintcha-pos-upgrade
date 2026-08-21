@@ -804,15 +804,24 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
      <div class="category-grid">
-        ${["matcha", "coffee", "dessert"].map(cat => `
-          <div class="category-box cat-${cat}">
-            <span class="cat-badge cat-${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
-            <span class="category-cups">${categoryTotals[cat].cups}</span>
-            <span class="category-sub">RM${categoryTotals[cat].revenue.toFixed(2)}</span>
-            ${categoryTotals[cat].discount > 0 ? `<span class="category-discount">-RM${categoryTotals[cat].discount.toFixed(2)} discount</span>` : ""}
-            ${renderCategoryDrinksList(categoryTotals[cat].drinks)}
-          </div>
-        `).join("")}
+  ${["matcha", "coffee"].map(cat => `
+    <div class="category-box cat-${cat}">
+      <span class="cat-badge cat-${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+      <span class="category-cups">${categoryTotals[cat].cups}</span>
+      <span class="category-sub">RM${categoryTotals[cat].revenue.toFixed(2)}</span>
+      ${categoryTotals[cat].discount > 0 ? `<span class="category-discount">-RM${categoryTotals[cat].discount.toFixed(2)} discount</span>` : ""}
+      ${renderCategoryDrinksList(categoryTotals[cat].drinks)}
+    </div>
+  `).join("")}
+   ${categoryTotals.dessert.cups > 0 ? `
+    <div class="category-box cat-dessert">
+      <span class="cat-badge cat-dessert">Dessert</span>
+      <span class="category-cups">${categoryTotals.dessert.cups}</span>
+      <span class="category-sub">RM${categoryTotals.dessert.revenue.toFixed(2)}</span>
+      ${categoryTotals.dessert.discount > 0 ? `<span class="category-discount">-RM${categoryTotals.dessert.discount.toFixed(2)} discount</span>` : ""}
+      ${renderCategoryDrinksList(categoryTotals.dessert.drinks)}
+    </div>
+  ` : ""}
         ${categoryTotals.cookiedoh.cups > 0 ? `
           <div class="category-box cat-cookiedoh">
             <span class="cat-badge cat-cookiedoh">🍪 Cookiedoh</span>
